@@ -1,0 +1,6 @@
+{
+  "name": "WebLead AI - Autonomous Client Acquisition Engine",
+  "description": "Production-ready autonomous lead discovery, real business research, website audit, opportunity scoring, AI personalized outreach, compliant follow-up CRM, and proposal generator for web developers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

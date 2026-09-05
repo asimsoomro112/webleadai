@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile and developer agency details",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "User avatar photo URL" },
+        "businessName": { "type": "string", "description": "Freelance or Agency Business Name" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "website": { "type": "string", "description": "Portfolio or company website URL" },
+        "bio": { "type": "string", "description": "Short bio or service description" },
+        "createdAt": { "type": "string", "description": "Account creation ISO timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update ISO timestamp" }
+      },
+      "required": ["uid", "email"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User configuration, target industries, audit preferences, and custom API key pool",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User UID reference" },
+        "profile": { "type": "object", "description": "Agency profile metadata" },
+        "pricingTiers": { "type": "array", "description": "Configured proposal pricing tiers" },
+        "targetIndustries": { "type": "array", "description": "Target business verticals" },
+        "auditPreferences": { "type": "object", "description": "Website audit inspection weights" },
+        "humanApprovalRequired": { "type": "boolean", "description": "Require human signoff before email delivery" },
+        "approvalMode": { "type": "string", "description": "Active approval mode: MANUAL or AUTO" },
+        "apiKeyPool": { "type": "array", "description": "User personal Gemini API keys pool" },
+        "onboardingCompleted": { "type": "boolean", "description": "Flag indicating onboarding wizard completed" },
+        "updatedAt": { "type": "string", "description": "Last settings update ISO timestamp" }
+      },
+      "required": ["userId"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Prospect business lead discovered and tracked in the acquisition pipeline",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique lead identifier" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "businessName": { "type": "string", "description": "Company name" },
+        "industry": { "type": "string", "description": "Business sector" },
+        "city": { "type": "string", "description": "City or territory" },
+        "websiteUrl": { "type": "string", "description": "Current website URL" },
+        "websiteStatus": { "type": "string", "description": "NO_WEBSITE, OUTDATED, BROKEN, MOBILE_BROKEN, SLOW, REDESIGN_READY" },
+        "pipelineStatus": { "type": "string", "description": "Current pipeline stage" },
+        "audit": { "type": "object", "description": "Diagnostic speed, UX, mobile audit results" },
+        "pitch": { "type": "object", "description": "Generated pitch email copy" },
+        "proposal": { "type": "object", "description": "Interactive interactive proposal" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "userId", "businessName"]
+    },
+    "AgentTask": {
+      "title": "AgentTask",
+      "description": "Background autonomous discovery task record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique task identifier" },
+        "userId": { "type": "string", "description": "User UID who initiated task" },
+        "query": { "type": "string", "description": "Target discovery query" },
+        "status": { "type": "string", "description": "QUEUED, RUNNING, COMPLETED, FAILED" },
+        "progress": { "type": "number", "description": "0 to 100 completion percentage" },
+        "leadsFound": { "type": "number", "description": "Number of leads discovered" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "userId", "query"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "User event notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique notification identifier" },
+        "userId": { "type": "string", "description": "Recipient user UID" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Body message" },
+        "type": { "type": "string", "description": "SUCCESS, WARNING, INFO, ALERT" },
+        "read": { "type": "boolean", "description": "Read status" },
+        "timestamp": { "type": "string", "description": "Notification ISO timestamp" }
+      },
+      "required": ["id", "userId", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User account profile and agency details"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserSettings",
+      "description": "User personal settings, pricing tiers, and custom API key pool"
+    },
+    "/users/{userId}/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Prospect business leads belonging strictly to this user"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "AgentTask",
+      "description": "Autonomous discovery tasks launched by this user"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "AppNotification",
+      "description": "Event notifications delivered to this user"
+    }
+  }
+}
