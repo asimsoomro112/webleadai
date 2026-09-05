@@ -1,12 +1,10 @@
 {
-  "projectId": "core-climber-x2t1j",
-  "appId": "1:965807065783:web:fe5ae514031eb8a57e9b32",
-  "apiKey": "AIzaSyB8eCHAwU3TFtChSTLizS3ntWcdqJToCQY",
-  "authDomain": "core-climber-x2t1j.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-webleadaiautonom-9fe58e96-eddd-4200-b49c-d31f37ba7619",
-  "storageBucket": "core-climber-x2t1j.firebasestorage.app",
-  "messagingSenderId": "965807065783",
-  "measurementId": "",
-  "oAuthClientId": "965807065783-kbtiibl8jmn4llhhrp4u3scvvdjfr6i0.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "apiKey": "AIzaSyD3YRZlJH8UVLcy9zX2c6TOa4O5Fw_VaJc",
+  "authDomain": "webleadai-a6c45.firebaseapp.com",
+  "projectId": "webleadai-a6c45",
+  "firestoreDatabaseId": "",
+  "storageBucket": "webleadai-a6c45.firebasestorage.app",
+  "messagingSenderId": "731618578017",
+  "appId": "1:731618578017:web:938850cc95195d663ea420",
+  "measurementId": "G-RCN16CL3X6"
 }
