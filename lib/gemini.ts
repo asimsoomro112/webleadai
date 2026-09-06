@@ -1,6 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { appStore, maskApiKey } from './store';
 import {
   getRequestGeminiPool,
   recordRequestGeminiKeyQuotaError,
@@ -18,47 +17,6 @@ import {
   WebsiteConcept,
   WebsiteStatus,
 } from './types';
-
-// Dynamic / active GoogleGenAI client tracking
-let currentActiveClient: GoogleGenAI | null = null;
-
-function resolveActiveGenAIClient(): GoogleGenAI {
-  if (currentActiveClient) {
-    return currentActiveClient;
-  }
-  const pool = getRequestGeminiPool() ?? appStore.getApiKeyPool();
-  const activeKey =
-    pool.keys.find((k) => k.status === 'ACTIVE')?.key ||
-    pool.keys[0]?.key ||
-    process.env.GEMINI_API_KEY;
-
-  if (!activeKey) {
-    throw new Error('No Gemini API key available in key pool or environment. Please configure keys in API Key Manager.');
-  }
-
-  return new GoogleGenAI({
-    apiKey: activeKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
-}
-
-// Proxied client that always points to the active client/key in current scope
-export function getGeminiClient(): GoogleGenAI {
-  return new Proxy({} as GoogleGenAI, {
-    get(_target, prop, receiver) {
-      const active = resolveActiveGenAIClient();
-      const value = Reflect.get(active, prop, receiver);
-      if (typeof value === 'function') {
-        return value.bind(active);
-      }
-      return value;
-    },
-  });
-}
 
 // Active production models per Gemini specification
 const PRIMARY_MODELS = [
@@ -79,7 +37,6 @@ export function isKeyQuotaOrExhaustionError(err: any): boolean {
   return (
     status === 429 ||
     status === 403 ||
-    status === 400 ||
     status === 'RESOURCE_EXHAUSTED' ||
     message.includes('429') ||
     message.includes('resource_exhausted') ||
@@ -136,9 +93,12 @@ function extractJsonFromResponse<T = any>(text: string): T | null {
  * 2. Model Cascade Fallback (gemini-3.8-flash -> gemini-3.6-flash -> gemini-flash-latest -> gemini-3.1-flash-lite)
  */
 async function callGeminiWithModelCascade(
-  callFn: (modelName: string, client?: GoogleGenAI) => Promise<any>
+  callFn: (modelName: string, client: GoogleGenAI) => Promise<any>
 ): Promise<any> {
-  const pool = getRequestGeminiPool() ?? appStore.getApiKeyPool();
+  const pool = getRequestGeminiPool();
+  if (!pool) {
+    throw new Error('Gemini calls must run within an authenticated user API-key context.');
+  }
   const enabledKeys = pool.keys.filter((k) => k.status !== 'DISABLED');
 
   // Active keys first, then quota-exhausted keys as secondary fallback if auto-rotation is on
@@ -147,23 +107,8 @@ async function callGeminiWithModelCascade(
     ...enabledKeys.filter((k) => k.status !== 'ACTIVE' && pool.autoRotateOnQuota),
   ];
 
-  // If pool has no keys, try process.env.GEMINI_API_KEY
-  if (keysToTry.length === 0 && process.env.GEMINI_API_KEY) {
-    keysToTry.push({
-      id: 'sys_env_default',
-      name: 'System Default Key',
-      key: process.env.GEMINI_API_KEY,
-      maskedKey: maskApiKey(process.env.GEMINI_API_KEY),
-      status: 'ACTIVE',
-      addedAt: new Date().toISOString(),
-      successCount: 0,
-      failureCount: 0,
-      isSystemDefault: true,
-    });
-  }
-
   if (keysToTry.length === 0) {
-    throw new Error('No Gemini API keys configured. Please add an API key in Settings > API Key Pool.');
+    throw new Error('No enabled Gemini API keys configured. Add or enable a key in Settings > API Key Pool.');
   }
 
   let lastError: any = null;
@@ -182,7 +127,6 @@ async function callGeminiWithModelCascade(
       },
     });
 
-    currentActiveClient = client;
     let keyQuotaHit = false;
 
     for (const model of PRIMARY_MODELS) {
@@ -190,9 +134,8 @@ async function callGeminiWithModelCascade(
         const res = await callFn(model, client);
         if (res) {
           if (!recordRequestGeminiKeySuccess(keyConfig.id)) {
-            appStore.markKeySuccess(keyConfig.id);
+            throw new Error('Gemini request was not associated with an authenticated user key pool.');
           }
-          currentActiveClient = null;
           return res;
         }
       } catch (err: any) {
@@ -205,7 +148,7 @@ async function callGeminiWithModelCascade(
             `[Key Pool Rotation] Key "${keyConfig.name}" reached quota/rate limit: ${msg}. Automatically rotating to next saved key...`
           );
           if (!recordRequestGeminiKeyQuotaError(keyConfig.id, msg)) {
-            appStore.markKeyQuotaExhausted(keyConfig.id, msg);
+            throw new Error('Gemini request was not associated with an authenticated user key pool.');
           }
           keyQuotaHit = true;
           break; // Break model loop, jump to next key in outer loop!
@@ -223,7 +166,6 @@ async function callGeminiWithModelCascade(
     }
   }
 
-  currentActiveClient = null;
   throw (
     lastError ||
     new Error(
@@ -246,7 +188,6 @@ export async function discoverRealBusinesses(params: {
   websiteStatusPreference?: string;
   minCount?: number;
 }): Promise<Partial<Lead>[]> {
-  const ai = getGeminiClient();
   const { category, city, country, keywords, websiteStatusPreference, minCount = 5 } = params;
 
   const targetCount = Math.min(Math.max(minCount, 3), 8);
@@ -295,8 +236,8 @@ Output only the raw JSON array.`;
   let parsed: any[] | null = null;
 
   try {
-    const searchRes = await callGeminiWithModelCascade(async (modelName) => {
-      return await ai.models.generateContent({
+    const searchRes = await callGeminiWithModelCascade(async (modelName, client) => {
+      return await client.models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
@@ -314,8 +255,8 @@ Output only the raw JSON array.`;
   // 2. If search grounding did not return clean parseable JSON, execute direct structured JSON mode
   if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
     try {
-      const directRes = await callGeminiWithModelCascade(async (modelName) => {
-        return await ai.models.generateContent({
+      const directRes = await callGeminiWithModelCascade(async (modelName, client) => {
+        return await client.models.generateContent({
           model: modelName,
           contents: prompt,
           config: {
@@ -420,8 +361,6 @@ export async function researchBusinessDeep(
   websiteAudit: WebsiteAudit;
   competitorGap: CompetitorGapAnalysis;
 }> {
-  const ai = getGeminiClient();
-
   const prompt = `Perform an in-depth digital audit and competitor intelligence analysis for this real business:
 - Business Name: ${business.businessName}
 - Category: ${business.category}
@@ -484,8 +423,8 @@ Generate a comprehensive, tailored audit and competitor analysis as a JSON objec
 }
 Output strictly valid JSON.`;
 
-  const response = await callGeminiWithModelCascade(async (modelName) => {
-    return await ai.models.generateContent({
+  const response = await callGeminiWithModelCascade(async (modelName, client) => {
+    return await client.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
@@ -526,7 +465,6 @@ export async function generateWebsiteConcept(params: {
   lead: Lead;
   profile: BusinessProfile;
 }): Promise<WebsiteConcept> {
-  const ai = getGeminiClient();
   const { lead, profile } = params;
 
   const prompt = `You are an elite UX/UI Creative Director and Conversion Architect for modern web applications.
@@ -606,8 +544,8 @@ Output strictly valid JSON with this schema:
   }
 }`;
 
-  const response = await callGeminiWithModelCascade(async (modelName) => {
-    return await ai.models.generateContent({
+  const response = await callGeminiWithModelCascade(async (modelName, client) => {
+    return await client.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
@@ -681,7 +619,6 @@ export async function classifyReplyIntent(params: {
   suggestedResponse: string;
   recommendedNextAction: string;
 }> {
-  const ai = getGeminiClient();
   const { prospectMessage, lead, profile } = params;
 
   const prompt = `You are an AI Sales Intelligence engine analyzing an incoming reply from a prospective client.
@@ -709,8 +646,8 @@ Output strictly valid JSON with this schema:
   "recommendedNextAction": "Specific next move (e.g. 'Send pricing tiers', 'Offer 10-minute demo call', 'Share concept mockup link')"
 }`;
 
-  const response = await callGeminiWithModelCascade(async (modelName) => {
-    return await ai.models.generateContent({
+  const response = await callGeminiWithModelCascade(async (modelName, client) => {
+    return await client.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
@@ -747,8 +684,6 @@ export async function generatePersonalizedOutreach(
   initialMessage: string;
   followUpSequence: Lead['followUpSequence'];
 }> {
-  const ai = getGeminiClient();
-
   const conceptSnippet = lead.websiteConcept
     ? `Mention that an interactive concept mockup has been drafted for ${lead.businessName} with direct WhatsApp booking.`
     : `Offer to share a free 2-page interactive mockup.`;
@@ -827,8 +762,8 @@ Output strictly valid JSON:
   ]
 }`;
 
-  const response = await callGeminiWithModelCascade(async (modelName) => {
-    return await ai.models.generateContent({
+  const response = await callGeminiWithModelCascade(async (modelName, client) => {
+    return await client.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
@@ -858,7 +793,6 @@ export async function askSalesCopilot(params: {
   question: string;
   profile: BusinessProfile;
 }): Promise<string> {
-  const ai = getGeminiClient();
   const { lead, question, profile } = params;
 
   const memory = lead.conversationMemory;
@@ -903,8 +837,8 @@ Output structured markdown with:
 ### 🔄 Alternative Option
 (Low-friction backup reply)`;
 
-  const response = await callGeminiWithModelCascade(async (modelName) => {
-    return await ai.models.generateContent({
+  const response = await callGeminiWithModelCascade(async (modelName, client) => {
+    return await client.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
@@ -930,7 +864,6 @@ export async function generateProposalDoc(params: {
   tier: 'STARTER' | 'PROFESSIONAL' | 'PREMIUM';
   priceOverride?: number;
 }): Promise<Proposal> {
-  const ai = getGeminiClient();
   const { lead, profile, tier, priceOverride } = params;
   const targetPrice = priceOverride || (tier === 'STARTER' ? 199 : tier === 'PROFESSIONAL' ? 499 : 999);
 
@@ -960,8 +893,8 @@ Output strictly valid JSON with this schema:
   "callToAction": "Clear next step instructions"
 }`;
 
-  const response = await callGeminiWithModelCascade(async (modelName) => {
-    return await ai.models.generateContent({
+  const response = await callGeminiWithModelCascade(async (modelName, client) => {
+    return await client.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
@@ -1000,56 +933,47 @@ Output strictly valid JSON with this schema:
 
 
 export async function generateSalesCopilotAdvice(lead: Lead, profile: any, query: string): Promise<string> {
-  const ai = getGeminiClient();
   const prompt = `You are an expert sales copilot for an agency: ${profile.name}.
 Lead: ${lead.businessName} (${lead.category}).
 Question: ${query}
 Provide a short, actionable piece of advice (1-2 paragraphs) for the sales rep.`;
-  try {
-    const res = await ai.models.generateContent({ model: 'gemini-3.5-flash', contents: prompt });
-    return res.text || 'No advice generated';
-  } catch (err) {
-    console.error(err);
-    return 'Error generating advice.';
-  }
+
+  const res = await callGeminiWithModelCascade((model, client) =>
+    client.models.generateContent({ model, contents: prompt }),
+  );
+  return res.text || 'No advice generated';
 }
 
 export async function generateEmailReply(lead: Lead, profile: any, action: string, objection?: string) {
-  const ai = getGeminiClient();
   const prompt = `You are a sales rep for ${profile.name}.
 Lead: ${lead.businessName}.
 They replied to your email with a ${action}. ${objection ? 'Objection: ' + objection : ''}
 Draft a short reply and determine if they are 'positive', 'negative', or 'objection'.
 Return JSON with { "reply": "...", "suggestedStatus": "positive|negative|objection" }`;
-  try {
-    const res = await ai.models.generateContent({ 
-      model: 'gemini-3.5-flash', 
+
+  const res = await callGeminiWithModelCascade((model, client) =>
+    client.models.generateContent({
+      model,
       contents: prompt,
-      config: { responseMimeType: 'application/json' }
-    });
-    return JSON.parse(res.text || '{}');
-  } catch (err) {
-    console.error(err);
-    return { reply: 'Thanks for getting back to us. Let me know if you change your mind.', suggestedStatus: action === 'accept' ? 'positive' : 'negative' };
-  }
+      config: { responseMimeType: 'application/json' },
+    }),
+  );
+  return JSON.parse(res.text || '{}');
 }
 
 export async function generateProjectHandoff(lead: Lead, profile: any, instructions: string) {
-  const ai = getGeminiClient();
   const prompt = `Generate a project handoff brief.
 Lead: ${lead.businessName}.
 Agency: ${profile.name}.
 Instructions: ${instructions}.
 Return JSON with { "summary": "...", "timeline": "...", "deliverables": ["..."] }`;
-  try {
-    const res = await ai.models.generateContent({ 
-      model: 'gemini-3.5-flash', 
+
+  const res = await callGeminiWithModelCascade((model, client) =>
+    client.models.generateContent({
+      model,
       contents: prompt,
-      config: { responseMimeType: 'application/json' }
-    });
-    return JSON.parse(res.text || '{}');
-  } catch (err) {
-    console.error(err);
-    return { summary: instructions, timeline: 'TBD', deliverables: [] };
-  }
+      config: { responseMimeType: 'application/json' },
+    }),
+  );
+  return JSON.parse(res.text || '{}');
 }
