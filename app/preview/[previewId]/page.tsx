@@ -41,7 +41,7 @@ export default function ConceptPreviewPage() {
     async function loadConcept() {
       try {
         setLoading(true);
-        const res = await fetch(`/api/concept/${previewId}`);
+        const res = await fetch(`/api/concept/${encodeURIComponent(previewId)}`);
         const json = await res.json();
         if (!res.ok) {
           throw new Error(json.error || 'Concept not found');
