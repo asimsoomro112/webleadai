@@ -3,6 +3,7 @@ import { discoverRealBusinesses, researchBusinessDeep, generatePersonalizedOutre
 import { calculateLeadScore } from '@/lib/scorer';
 import { Lead } from '@/lib/types';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,14 +30,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'minCount must be an integer between 1 and 10.' }, { status: 400 });
     }
 
-    const rawBusinesses = await discoverRealBusinesses({
-      category,
-      city,
-      country,
-      keywords,
-      websiteStatusPreference,
-      minCount,
-    });
+    return withUserGeminiPool(authResult.uid, async () => {
+      const rawBusinesses = await discoverRealBusinesses({
+        category,
+        city,
+        country,
+        keywords,
+        websiteStatusPreference,
+        minCount,
+      });
 
     const addedLeads: Lead[] = [];
 
@@ -110,7 +112,8 @@ export async function POST(req: NextRequest) {
       addedLeads.push(leadPayload as unknown as Lead);
     }
 
-    return NextResponse.json({ success: true, leads: addedLeads });
+      return NextResponse.json({ success: true, leads: addedLeads });
+    });
   } catch (error: any) {
     console.error('Discovery process failed:', error);
     return NextResponse.json({ error: error?.message || 'Discovery failed' }, { status: 500 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePersonalizedOutreach } from '@/lib/gemini';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required payload' }, { status: 400 });
     }
 
-    const outreach = await generatePersonalizedOutreach(lead, settings.profile);
+    const outreach = await withUserGeminiPool(authResult.uid, () => generatePersonalizedOutreach(lead, settings.profile));
 
     const updatedLead = {
       ...lead,

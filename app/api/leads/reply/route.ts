@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateEmailReply } from '@/lib/gemini';
 import { PipelineStatus } from '@/lib/types';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +15,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required' }, { status: 400 });
     }
 
-    const { reply, suggestedStatus } = await generateEmailReply(lead, settings.profile, action, objection);
+    const { reply, suggestedStatus } = await withUserGeminiPool(
+      authResult.uid,
+      () => generateEmailReply(lead, settings.profile, action, objection),
+    );
 
     let nextStatus: PipelineStatus = lead.status;
     if (suggestedStatus === 'positive') nextStatus = 'INTERESTED';

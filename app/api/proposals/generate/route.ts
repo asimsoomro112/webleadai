@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateProposalDoc } from '@/lib/gemini';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,12 +14,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required' }, { status: 400 });
     }
 
-    const proposal = await generateProposalDoc({
+    const proposal = await withUserGeminiPool(authResult.uid, () => generateProposalDoc({
       lead,
       profile: settings.profile,
       tier,
       priceOverride,
-    });
+    }));
 
     const updatedProposals = [proposal, ...(lead.proposals || [])];
     const updatedLead = {

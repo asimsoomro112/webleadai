@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebsiteConcept } from '@/lib/gemini';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required' }, { status: 400 });
     }
 
-    const concept = await generateWebsiteConcept({ lead, profile: settings.profile });
+    const concept = await withUserGeminiPool(authResult.uid, () => generateWebsiteConcept({ lead, profile: settings.profile }));
 
     const updatedLead = { ...lead, websiteConcept: concept };
 

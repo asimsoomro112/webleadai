@@ -3,6 +3,7 @@ import { generatePersonalizedOutreach, generateWebsiteConcept, researchBusinessD
 import { calculateLeadScore } from '@/lib/scorer';
 import { Lead, AppSettings } from '@/lib/types';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     const unresearched = leads.filter((l) => !l.websiteAudit && l.status !== 'LOST');
     for (const lead of unresearched.slice(0, 2)) {
       try {
-        const research = await researchBusinessDeep(lead);
+        const research = await withUserGeminiPool(authResult.uid, () => researchBusinessDeep(lead));
         const score = calculateLeadScore(
           { ...lead, websiteAudit: research.websiteAudit, growthSignals: research.growthSignals },
           settings.scoringWeights
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     );
     for (const lead of needsOutreach.slice(0, 2)) {
       try {
-        const outreach = await generatePersonalizedOutreach(lead, settings.profile);
+        const outreach = await withUserGeminiPool(authResult.uid, () => generatePersonalizedOutreach(lead, settings.profile));
         const mLead = getMutableLead(lead);
         Object.assign(mLead, {
           generatedSubject: outreach.subject,
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
     );
     for (const lead of needsConcept.slice(0, 1)) {
       try {
-        const concept = await generateWebsiteConcept({ lead, profile: settings.profile });
+        const concept = await withUserGeminiPool(authResult.uid, () => generateWebsiteConcept({ lead, profile: settings.profile }));
         const mLead = getMutableLead(lead);
         mLead.websiteConcept = concept;
         actionsTaken.push(`Generated concept for ${lead.businessName}`);

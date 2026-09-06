@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateSalesCopilotAdvice } from '@/lib/gemini';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required' }, { status: 400 });
     }
 
-    const answer = await generateSalesCopilotAdvice(lead, settings.profile, query);
+    const answer = await withUserGeminiPool(authResult.uid, () => generateSalesCopilotAdvice(lead, settings.profile, query));
 
     return NextResponse.json({ success: true, answer });
   } catch (error: any) {

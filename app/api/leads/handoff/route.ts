@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateProjectHandoff } from '@/lib/gemini';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { withUserGeminiPool } from '@/lib/user-gemini-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required' }, { status: 400 });
     }
 
-    const handoff = await generateProjectHandoff(lead, settings.profile, instructions);
+    const handoff = await withUserGeminiPool(authResult.uid, () => generateProjectHandoff(lead, settings.profile, instructions));
 
     const updatedLead = {
       ...lead,

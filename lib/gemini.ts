@@ -2,6 +2,11 @@ import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'crypto';
 import { appStore, maskApiKey } from './store';
 import {
+  getRequestGeminiPool,
+  recordRequestGeminiKeyQuotaError,
+  recordRequestGeminiKeySuccess,
+} from './user-gemini-context';
+import {
   BusinessProfile,
   CompetitorGapAnalysis,
   ContactVerification,
@@ -21,7 +26,7 @@ function resolveActiveGenAIClient(): GoogleGenAI {
   if (currentActiveClient) {
     return currentActiveClient;
   }
-  const pool = appStore.getApiKeyPool();
+  const pool = getRequestGeminiPool() ?? appStore.getApiKeyPool();
   const activeKey =
     pool.keys.find((k) => k.status === 'ACTIVE')?.key ||
     pool.keys[0]?.key ||
@@ -133,7 +138,7 @@ function extractJsonFromResponse<T = any>(text: string): T | null {
 async function callGeminiWithModelCascade(
   callFn: (modelName: string, client?: GoogleGenAI) => Promise<any>
 ): Promise<any> {
-  const pool = appStore.getApiKeyPool();
+  const pool = getRequestGeminiPool() ?? appStore.getApiKeyPool();
   const enabledKeys = pool.keys.filter((k) => k.status !== 'DISABLED');
 
   // Active keys first, then quota-exhausted keys as secondary fallback if auto-rotation is on
@@ -184,7 +189,9 @@ async function callGeminiWithModelCascade(
       try {
         const res = await callFn(model, client);
         if (res) {
-          appStore.markKeySuccess(keyConfig.id);
+          if (!recordRequestGeminiKeySuccess(keyConfig.id)) {
+            appStore.markKeySuccess(keyConfig.id);
+          }
           currentActiveClient = null;
           return res;
         }
@@ -197,7 +204,9 @@ async function callGeminiWithModelCascade(
           console.warn(
             `[Key Pool Rotation] Key "${keyConfig.name}" reached quota/rate limit: ${msg}. Automatically rotating to next saved key...`
           );
-          appStore.markKeyQuotaExhausted(keyConfig.id, msg);
+          if (!recordRequestGeminiKeyQuotaError(keyConfig.id, msg)) {
+            appStore.markKeyQuotaExhausted(keyConfig.id, msg);
+          }
           keyQuotaHit = true;
           break; // Break model loop, jump to next key in outer loop!
         }
