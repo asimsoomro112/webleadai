@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { appStore } from '@/lib/store';
 import { GoogleGenAI } from '@google/genai';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
+import { getUserApiKeyPool, saveUserApiKeyPool } from '@/lib/user-api-key-pool';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,12 +14,14 @@ export async function POST(req: NextRequest) {
     let targetName = 'Provided Key';
 
     if (id) {
-      const pool = appStore.getApiKeyPool();
+      // Custom keys are stored per user in Firestore. Do not look in the
+      // process-local appStore here: it does not contain a user's saved keys
+      // on a serverless instance.
+      const pool = await getUserApiKeyPool(authResult.uid);
       const found = pool.keys.find((k) => k.id === id);
-      if (found) {
-        targetKey = found.key;
-        targetName = found.name;
-      }
+      if (!found) return NextResponse.json({ error: 'Saved API key was not found.' }, { status: 404 });
+      targetKey = found.key;
+      targetName = found.name;
     }
 
     if (!targetKey || typeof targetKey !== 'string') {
@@ -51,7 +53,15 @@ export async function POST(req: NextRequest) {
     const replyText = res?.text?.trim() || '';
 
     if (id) {
-      appStore.markKeySuccess(id);
+      const pool = await getUserApiKeyPool(authResult.uid);
+      const found = pool.keys.find((keyConfig) => keyConfig.id === id);
+      if (found) {
+        found.status = 'ACTIVE';
+        found.successCount += 1;
+        found.lastUsedAt = new Date().toISOString();
+        delete found.lastError;
+        await saveUserApiKeyPool(authResult.uid, pool);
+      }
     }
 
     return NextResponse.json({
