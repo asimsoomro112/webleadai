@@ -264,12 +264,12 @@ export function LeadDetailDrawer({
             </h2>
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                lead.scoreBreakdown.tier === 'HOT'
+                lead.scoreBreakdown?.tier === 'HOT'
                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
                   : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
               }`}
             >
-              {lead.scoreBreakdown.totalScore}/100 {lead.scoreBreakdown.tier}
+              {lead.scoreBreakdown?.totalScore ?? 0}/100 {lead.scoreBreakdown?.tier || 'WARM'}
             </span>
           </div>
 
@@ -318,7 +318,7 @@ export function LeadDetailDrawer({
       </div>
 
       {/* Autonomous Next Best Action Banner */}
-      {lead.nextBestAction && (
+      {lead.nextBestAction?.action && (
         <div className="px-6 py-3 bg-emerald-500/10 dark:bg-emerald-950/40 border-b border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-start gap-2">
             <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
@@ -328,14 +328,14 @@ export function LeadDetailDrawer({
                   AI Next Best Action:
                 </span>
                 <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  {lead.nextBestAction.action.replace(/_/g, ' ')}
+                  {(lead.nextBestAction.action || '').replace(/_/g, ' ')}
                 </span>
                 <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                  {lead.nextBestAction.priority}
+                  {lead.nextBestAction.priority || lead.nextBestAction.urgency || 'HIGH'}
                 </span>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                {lead.nextBestAction.reasoning}
+                {lead.nextBestAction.reasoning || lead.nextBestAction.reason || ''}
               </p>
             </div>
           </div>
@@ -1031,7 +1031,7 @@ export function LeadDetailDrawer({
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                          Day {step.day}: {step.type.replace(/_/g, ' ')}
+                          Day {step.day}: {(step.type || '').replace(/_/g, ' ')}
                         </span>
                         <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                           via {step.channel}
@@ -1070,7 +1070,7 @@ export function LeadDetailDrawer({
                 </h4>
                 {lead.conversationMemory?.currentIntent && lead.conversationMemory.currentIntent !== 'UNASSIGNED' && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                    Intent: {lead.conversationMemory.currentIntent.replace(/_/g, ' ')}
+                    Intent: {(lead.conversationMemory.currentIntent || '').replace(/_/g, ' ')}
                   </span>
                 )}
               </div>

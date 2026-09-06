@@ -4,6 +4,7 @@ import { calculateLeadScore } from '@/lib/scorer';
 import { Lead } from '@/lib/types';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
 import { withUserGeminiPool } from '@/lib/user-gemini-context';
+import { normalizeLead } from '@/lib/lead-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,17 +44,19 @@ export async function POST(req: NextRequest) {
     const addedLeads: Lead[] = [];
 
     for (const b of rawBusinesses) {
-      let leadPayload = {
+      let leadPayload = normalizeLead({
+        ...b,
         id: `lead_${Date.now()}_${Math.random().toString(36).substring(7)}`,
         businessName: b.businessName || "Unknown",
         category: b.category || category,
         city: b.city || city,
         country: b.country || country,
         websiteUrl: b.websiteUrl || "",
+        websiteStatus: b.websiteStatus || (b.websiteUrl ? 'OUTDATED_WEBSITE' : 'NO_WEBSITE'),
         phone: b.phone,
-        status: 'NEW' as import("@/lib/types").PipelineStatus,
-                        activities: [] as any[],
-      };
+        status: 'NEW',
+        activities: [],
+      });
 
       if (autoResearch) {
         try {
@@ -64,19 +67,20 @@ export async function POST(req: NextRequest) {
           );
           
           Object.assign(leadPayload, {
-            painPoints: research.painPoints,
-            growthSignals: research.growthSignals,
-            recommendedService: research.recommendedService,
-            recommendedPrice: research.recommendedPrice,
+            painPoints: research.painPoints || leadPayload.painPoints,
+            growthSignals: research.growthSignals || leadPayload.growthSignals,
+            recommendedService: research.recommendedService || leadPayload.recommendedService,
+            recommendedPrice: research.recommendedPrice || leadPayload.recommendedPrice,
             websiteAudit: research.websiteAudit,
             competitorGap: research.competitorGap,
             scoreBreakdown,
-            dealValue: research.recommendedPrice,
+            dealValue: research.recommendedPrice || leadPayload.dealValue,
             status: 'QUALIFIED',
           });
 
-          leadPayload.activities!.push({
+          leadPayload.activities.push({
             id: `act_${Date.now()}_r`,
+            timestamp: new Date().toISOString(),
             date: new Date().toISOString(),
             type: 'RESEARCHED',
             title: 'Auto-Researched during Discovery',
@@ -97,8 +101,9 @@ export async function POST(req: NextRequest) {
             status: 'MESSAGE_READY',
           });
 
-          leadPayload.activities!.push({
+          leadPayload.activities.push({
             id: `act_${Date.now()}_m`,
+            timestamp: new Date().toISOString(),
             date: new Date().toISOString(),
             type: 'MESSAGE_GENERATED',
             title: 'Auto-Generated Outreach during Discovery',
@@ -109,7 +114,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      addedLeads.push(leadPayload as unknown as Lead);
+      addedLeads.push(normalizeLead(leadPayload));
     }
 
       return NextResponse.json({ success: true, leads: addedLeads });

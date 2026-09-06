@@ -407,12 +407,12 @@ export function DiscoveryEngine({ onLeadsDiscovered, onSelectLead, settings }: D
                     </h3>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        lead.scoreBreakdown.tier === 'HOT'
+                        lead.scoreBreakdown?.tier === 'HOT'
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
                           : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
                       }`}
                     >
-                      {lead.scoreBreakdown.totalScore}/100 {lead.scoreBreakdown.tier}
+                      {lead.scoreBreakdown?.totalScore ?? 0}/100 {lead.scoreBreakdown?.tier || 'WARM'}
                     </span>
                   </div>
 
@@ -421,7 +421,7 @@ export function DiscoveryEngine({ onLeadsDiscovered, onSelectLead, settings }: D
                   </div>
 
                   <div className="text-xs text-zinc-600 dark:text-zinc-300 font-medium line-clamp-2">
-                    {lead.painPoints[0] || 'Opportunity for modern web development overhaul.'}
+                    {(lead.painPoints && lead.painPoints[0]) || 'Opportunity for modern web development overhaul.'}
                   </div>
                 </div>
 

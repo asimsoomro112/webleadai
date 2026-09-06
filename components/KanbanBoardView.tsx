@@ -136,7 +136,7 @@ export function KanbanBoardView({
                         <h3 className="font-bold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-1">
                           {lead.businessName}
                         </h3>
-                        {lead.scoreBreakdown.tier === 'HOT' && (
+                        {lead.scoreBreakdown?.tier === 'HOT' && (
                           <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                             HOT
                           </span>
@@ -151,11 +151,11 @@ export function KanbanBoardView({
 
                       {/* Main Problem / Pain Point */}
                       <p className="text-[11px] text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-tight">
-                        {lead.painPoints[0] || lead.description}
+                        {(lead.painPoints && lead.painPoints[0]) || lead.description || 'Active business opportunity'}
                       </p>
 
                       {/* Next Best Action Tag */}
-                      {lead.nextBestAction && (
+                      {lead.nextBestAction?.action && (
                         <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           <span className="truncate">Next: {lead.nextBestAction.action.replace(/_/g, ' ')}</span>

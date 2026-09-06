@@ -24,6 +24,7 @@ import {
   saveUserSettings,
 } from '@/lib/firestoreService';
 import { apiFetch } from '@/lib/api-client';
+import { normalizeLead } from '@/lib/lead-utils';
 
 export default function Home() {
   const { user, userProfile, userSettings } = useAuth();
@@ -63,13 +64,16 @@ export default function Home() {
     const locationMetrics = new Map<string, number>();
     const statusMetrics = new Map<PipelineStatus, number>();
     leads.forEach((lead) => {
-      const category = categoryMetrics.get(lead.category) ?? { count: 0, value: 0 };
-      categoryMetrics.set(lead.category, {
-        count: category.count + 1,
-        value: category.value + (lead.dealValue || lead.recommendedPrice || 450),
+      const category = lead.category || 'General';
+      const city = lead.city || 'Karachi';
+      const status = (lead.status || 'NEW') as PipelineStatus;
+      const catMetric = categoryMetrics.get(category) ?? { count: 0, value: 0 };
+      categoryMetrics.set(category, {
+        count: catMetric.count + 1,
+        value: catMetric.value + (lead.dealValue || lead.recommendedPrice || 450),
       });
-      locationMetrics.set(lead.city, (locationMetrics.get(lead.city) ?? 0) + 1);
-      statusMetrics.set(lead.status, (statusMetrics.get(lead.status) ?? 0) + 1);
+      locationMetrics.set(city, (locationMetrics.get(city) ?? 0) + 1);
+      statusMetrics.set(status, (statusMetrics.get(status) ?? 0) + 1);
     });
 
     return {
@@ -163,7 +167,7 @@ export default function Home() {
 
       if (leadsRes.ok) {
         const d = await leadsRes.json();
-        setLeads(d.leads || []);
+        setLeads((d.leads || []).map(normalizeLead));
       }
       if (settingsRes.ok) {
         const d = await settingsRes.json();
@@ -217,7 +221,7 @@ export default function Home() {
     // 1. Subscribe to User Leads
     const unsubscribeLeads = subscribeUserLeads(user.uid, (cloudLeads) => {
       if (cloudLeads && cloudLeads.length > 0) {
-        setLeads(cloudLeads);
+        setLeads(cloudLeads.map(normalizeLead));
       }
     });
 
@@ -401,9 +405,10 @@ export default function Home() {
 
   // Discovered Leads Callback
   const handleLeadsDiscovered = (newLeads: Lead[]) => {
-    setLeads((prev) => [...newLeads, ...prev.filter((p) => !newLeads.some((n) => n.id === p.id))]);
+    const safeLeads = newLeads.map(normalizeLead);
+    setLeads((prev) => [...safeLeads, ...prev.filter((p) => !safeLeads.some((n) => n.id === p.id))]);
     if (user) {
-      for (const l of newLeads) {
+      for (const l of safeLeads) {
         saveUserLead(user.uid, l).catch(console.error);
       }
     }

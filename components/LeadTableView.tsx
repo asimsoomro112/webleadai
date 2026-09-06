@@ -55,8 +55,8 @@ export function LeadTableView({
     if (selectedCategory !== 'ALL' && l.category !== selectedCategory) return false;
     if (selectedCity !== 'ALL' && l.city !== selectedCity) return false;
     if (selectedStatus !== 'ALL' && l.status !== selectedStatus) return false;
-    if (selectedTier !== 'ALL' && l.scoreBreakdown.tier !== selectedTier) return false;
-    if (selectedWebsiteStatus !== 'ALL' && l.websiteStatus !== selectedWebsiteStatus) return false;
+    if (selectedTier !== 'ALL' && l.scoreBreakdown?.tier !== selectedTier) return false;
+    if (selectedWebsiteStatus !== 'ALL' && (l.websiteStatus || 'NO_WEBSITE') !== selectedWebsiteStatus) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -71,7 +71,7 @@ export function LeadTableView({
 
   // Apply sorting
   filteredLeads.sort((a, b) => {
-    if (sortBy === 'score') return b.scoreBreakdown.totalScore - a.scoreBreakdown.totalScore;
+    if (sortBy === 'score') return (b.scoreBreakdown?.totalScore ?? 0) - (a.scoreBreakdown?.totalScore ?? 0);
     if (sortBy === 'value') return (b.dealValue || 0) - (a.dealValue || 0);
     if (sortBy === 'newest') return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     if (sortBy === 'oldest') return new Date(a.discoveredAt).getTime() - new Date(b.discoveredAt).getTime();
@@ -260,7 +260,7 @@ export function LeadTableView({
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-1.5 flex-wrap">
                         <span>{lead.businessName}</span>
-                        {lead.scoreBreakdown.tier === 'HOT' && (
+                        {lead.scoreBreakdown?.tier === 'HOT' && (
                           <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                         )}
                         {lead.websiteConcept && (
@@ -269,7 +269,7 @@ export function LeadTableView({
                           </span>
                         )}
                       </div>
-                      {lead.nextBestAction && (
+                      {lead.nextBestAction?.action && (
                         <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           <span>Next: {lead.nextBestAction.action.replace(/_/g, ' ')}</span>
@@ -297,12 +297,12 @@ export function LeadTableView({
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                             lead.websiteStatus === 'NO_WEBSITE'
                               ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300'
-                              : lead.websiteStatus === 'OUTDATED'
+                              : lead.websiteStatus === 'OUTDATED' || lead.websiteStatus === 'OUTDATED_WEBSITE'
                               ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
                               : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300'
                           }`}
                         >
-                          {lead.websiteStatus.replace('_', ' ')}
+                          {(lead.websiteStatus || 'NO_WEBSITE').replace(/_/g, ' ')}
                         </span>
                         {lead.websiteAudit && (
                           <span className="text-[10px] text-zinc-400">
@@ -317,17 +317,17 @@ export function LeadTableView({
                       <div className="flex items-center gap-2">
                         <div
                           className={`font-bold text-xs px-2 py-1 rounded-md ${
-                            lead.scoreBreakdown.tier === 'HOT'
+                            lead.scoreBreakdown?.tier === 'HOT'
                               ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                              : lead.scoreBreakdown.tier === 'HIGH'
+                              : lead.scoreBreakdown?.tier === 'HIGH'
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                               : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                           }`}
                         >
-                          {lead.scoreBreakdown.totalScore}/100
+                          {lead.scoreBreakdown?.totalScore ?? 0}/100
                         </div>
                         <span className="text-[10px] font-semibold text-zinc-500">
-                          {lead.scoreBreakdown.tier}
+                          {lead.scoreBreakdown?.tier || 'WARM'}
                         </span>
                       </div>
                     </td>

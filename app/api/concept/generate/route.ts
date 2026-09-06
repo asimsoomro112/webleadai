@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
 
     const newActivity = {
       id: `act_${Date.now()}`,
+      timestamp: new Date().toISOString(),
       date: new Date().toISOString(),
       type: 'CONCEPT_GENERATED',
       title: 'Interactive Web Concept Built',

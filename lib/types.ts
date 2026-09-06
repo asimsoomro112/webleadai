@@ -381,6 +381,7 @@ export interface ProjectHandoff {
 export interface LeadActivity {
   id: string;
   timestamp: string;
+  date?: string;
   type:
     | 'DISCOVERED'
     | 'VERIFIED'

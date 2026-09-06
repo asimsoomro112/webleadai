@@ -13,6 +13,7 @@ import {
 import { db } from './firebase';
 import { AppNotification, AppSettings, Lead, AgentTask, UserAccount } from './types';
 import { DEFAULT_SETTINGS, SEED_LEADS } from './store';
+import { normalizeLead } from './lead-utils';
 
 // Helper to remove undefined properties before writing to Firestore
 export function cleanForFirestore<T>(data: T): T {
@@ -128,7 +129,14 @@ export function subscribeUserLeads(
     (snapshot) => {
       const leads: Lead[] = [];
       snapshot.forEach((d) => {
-        leads.push(d.data() as Lead);
+        try {
+          const raw = d.data();
+          if (raw) {
+            leads.push(normalizeLead(raw));
+          }
+        } catch (e) {
+          console.error('Error normalizing lead from Firestore:', e);
+        }
       });
       onUpdate(leads);
     },
@@ -141,8 +149,9 @@ export function subscribeUserLeads(
 export async function saveUserLead(uid: string, lead: Lead): Promise<void> {
   try {
     const ref = doc(db, 'users', uid, 'leads', lead.id);
+    const safeLead = normalizeLead(lead);
     const cleaned = cleanForFirestore({
-      ...lead,
+      ...safeLead,
       userId: uid,
       updatedAt: new Date().toISOString(),
     });

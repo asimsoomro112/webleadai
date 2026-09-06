@@ -89,8 +89,10 @@ export default function ConceptPreviewPage() {
   }
 
   const { lead, concept, developer } = data;
-  const whatsappUrl = `https://wa.me/${lead.phone?.replace(/[^0-9]/g, '') || developer.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi ${lead.businessName}, I would like to inquire regarding reservations and orders.`)}`;
-  const claimWebsiteUrl = `https://wa.me/${developer.whatsapp?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi ${developer.name}, I love the website concept for ${lead.businessName}! I want to discuss launching it.`)}`;
+  const leadPhone = (lead.phone || '').replace(/[^0-9]/g, '');
+  const devPhone = (developer?.whatsapp || '').replace(/[^0-9]/g, '');
+  const whatsappUrl = `https://wa.me/${leadPhone || devPhone}?text=${encodeURIComponent(`Hi ${lead.businessName || 'there'}, I would like to inquire regarding reservations and orders.`)}`;
+  const claimWebsiteUrl = `https://wa.me/${devPhone}?text=${encodeURIComponent(`Hi ${developer?.name || 'there'}, I love the website concept for ${lead.businessName || 'our business'}! I want to discuss launching it.`)}`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -187,7 +189,7 @@ export default function ConceptPreviewPage() {
             </div>
             <div className="flex-1 max-w-sm mx-4 bg-slate-900 border border-slate-800 rounded-md px-3 py-1 flex items-center justify-center gap-1.5 text-slate-300 text-xs truncate">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="truncate">https://{lead.businessName.toLowerCase().replace(/[^a-z0-9]/g, '')}.pk</span>
+              <span className="truncate">https://{(lead.businessName || 'preview').toLowerCase().replace(/[^a-z0-9]/g, '')}.pk</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 font-mono">Next.js 15</span>

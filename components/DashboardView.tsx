@@ -44,9 +44,9 @@ export function DashboardView({
     );
   }
 
-  const hotLeads = leads.filter((l) => l.scoreBreakdown.tier === 'HOT').slice(0, 5);
+  const hotLeads = leads.filter((l) => l.scoreBreakdown?.tier === 'HOT').slice(0, 5);
   const recentLeads = [...leads]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => new Date(b.updatedAt || (b as any).createdAt || 0).getTime() - new Date(a.updatedAt || (a as any).createdAt || 0).getTime())
     .slice(0, 6);
 
   return (
@@ -330,7 +330,7 @@ export function DashboardView({
                         {lead.businessName}
                       </h3>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                        {lead.scoreBreakdown.totalScore}/100 HOT
+                        {lead.scoreBreakdown?.totalScore ?? 0}/100 HOT
                       </span>
                     </div>
                     <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
@@ -387,17 +387,17 @@ export function DashboardView({
                       {lead.businessName}
                     </h3>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                      {lead.websiteStatus.replace('_', ' ')}
+                      {(lead.websiteStatus || 'NO_WEBSITE').replace(/_/g, ' ')}
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-1">
-                    {lead.painPoints[0] || lead.description}
+                    {(lead.painPoints && lead.painPoints[0]) || lead.description || 'Active business opportunity'}
                   </p>
                 </div>
 
                 <div className="text-right shrink-0">
                   <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                    {lead.scoreBreakdown.totalScore}/100
+                    {lead.scoreBreakdown?.totalScore ?? 0}/100
                   </div>
                   <div className="text-[11px] text-zinc-400">
                     {lead.city}
