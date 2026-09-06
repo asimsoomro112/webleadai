@@ -43,6 +43,37 @@ export async function requireApiUser(req: NextRequest): Promise<ApiUser | NextRe
     return { uid: decoded.uid, email: decoded.email };
   } catch (error) {
     console.error('API authentication failed:', error);
+
+    const errorCode = typeof error === 'object' && error !== null && 'code' in error
+      ? String(error.code)
+      : '';
+    const errorMessage = error instanceof Error ? error.message : '';
+
+    if (errorMessage.includes('Server authentication is not configured')) {
+      return NextResponse.json(
+        { error: 'Server Firebase Admin credentials are missing. Configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in Vercel, then redeploy.' },
+        { status: 500 },
+      );
+    }
+
+    if (errorMessage.includes('incorrect "aud"') || errorMessage.includes('incorrect "iss"')) {
+      return NextResponse.json(
+        { error: 'Server Firebase project does not match the signed-in account. Use service-account credentials from the same Firebase project as the web app, then redeploy.' },
+        { status: 500 },
+      );
+    }
+
+    if (errorCode === 'auth/id-token-expired' || errorCode === 'auth/id-token-revoked') {
+      return NextResponse.json({ error: 'Your session has expired. Please sign in again.' }, { status: 401 });
+    }
+
+    if (errorCode.startsWith('app/') || errorCode === 'auth/invalid-credential') {
+      return NextResponse.json(
+        { error: 'Server Firebase Admin credentials are invalid. Generate a new service-account key for this Firebase project, update Vercel, and redeploy.' },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ error: 'Your session is invalid or has expired. Please sign in again.' }, { status: 401 });
   }
 }
