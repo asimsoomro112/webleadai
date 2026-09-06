@@ -17,19 +17,24 @@ function normalizeKey(value: unknown): GeminiKeyConfig | null {
   const key = value as Partial<GeminiKeyConfig>;
   if (!key.id || !key.key || !key.name) return null;
 
-  return {
+  const normalized: GeminiKeyConfig = {
     id: key.id,
     name: key.name,
     key: key.key,
     maskedKey: maskApiKey(key.key),
     status: key.status ?? 'ACTIVE',
     addedAt: key.addedAt ?? new Date().toISOString(),
-    lastUsedAt: key.lastUsedAt,
-    lastError: key.lastError,
     successCount: key.successCount ?? 0,
     failureCount: key.failureCount ?? 0,
     isSystemDefault: false,
   };
+
+  // Firestore rejects fields whose value is undefined. Keep optional values out
+  // of the persisted shape until there is an actual value to store.
+  if (typeof key.lastUsedAt === 'string') normalized.lastUsedAt = key.lastUsedAt;
+  if (typeof key.lastError === 'string') normalized.lastError = key.lastError;
+
+  return normalized;
 }
 
 function normalizePool(value: unknown): ApiKeyPoolSettings {
@@ -56,7 +61,19 @@ export async function getUserApiKeyPool(uid: string): Promise<ApiKeyPoolSettings
 
 export async function saveUserApiKeyPool(uid: string, pool: ApiKeyPoolSettings): Promise<ApiKeyPoolSettings> {
   const normalized = normalizePool(pool);
-  await poolRef(uid).set({ ...normalized, updatedAt: new Date().toISOString() });
+  const firestorePool = {
+    keys: normalized.keys.map(({ lastUsedAt, lastError, ...key }) => ({
+      ...key,
+      ...(lastUsedAt ? { lastUsedAt } : {}),
+      ...(lastError ? { lastError } : {}),
+    })),
+    autoRotateOnQuota: normalized.autoRotateOnQuota,
+    ...(normalized.activeKeyId ? { activeKeyId: normalized.activeKeyId } : {}),
+    ...(normalized.lastRotationEvent ? { lastRotationEvent: normalized.lastRotationEvent } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await poolRef(uid).set(firestorePool);
   return normalized;
 }
 
