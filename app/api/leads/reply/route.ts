@@ -15,22 +15,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required' }, { status: 400 });
     }
 
-    const { reply, suggestedStatus } = await withUserGeminiPool(
+    const analysisResult = await withUserGeminiPool(
       authResult.uid,
       () => generateEmailReply(lead, settings.profile, action, objection),
     );
 
+    const {
+      reply,
+      suggestedStatus,
+      classifiedIntent = 'GENERAL_INQUIRY',
+      voiceNoteScript,
+      salesClosingTip,
+      actionableStep,
+    } = analysisResult;
+
     let nextStatus: PipelineStatus = lead.status;
     if (suggestedStatus === 'positive') nextStatus = 'INTERESTED';
     if (suggestedStatus === 'negative') nextStatus = 'LOST';
-    if (suggestedStatus === 'objection') nextStatus = 'CONTACTED';
+    if (suggestedStatus === 'objection') nextStatus = 'OBJECTION_HANDLING';
+
+    const incomingText = objection || (action === 'accept' ? 'Yes, I am interested.' : action === 'reject' ? 'No thanks.' : 'Can you tell me more?');
 
     const newReply = {
       id: `msg_${Date.now()}`,
       date: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       sender: 'lead',
-      content: action === 'accept' ? 'Yes, I am interested.' : action === 'reject' ? 'No thanks.' : objection || 'I have some concerns.',
+      content: incomingText,
+      messageText: incomingText,
       replyDraft: reply,
+      voiceNoteScript,
+      classifiedIntent,
     };
 
     const updatedSequence = [...(lead.followUpSequence || [])];
@@ -40,23 +55,51 @@ export async function POST(req: NextRequest) {
       updatedSequence[lastPendingIdx].repliedAt = new Date().toISOString();
     }
 
+    // Update conversationMemory
+    const existingMessages = lead.conversationMemory?.messages || [];
+    const updatedConversationMemory = {
+      leadId: lead.id,
+      summary: `Prospect replied: "${incomingText.slice(0, 60)}...". Intent: ${classifiedIntent}. Suggested status: ${nextStatus}.`,
+      lastContactedAt: new Date().toISOString(),
+      messages: [
+        ...existingMessages,
+        {
+          id: `msg_conv_${Date.now()}`,
+          sender: 'PROSPECT' as const,
+          channel: lead.primaryChannel || 'WHATSAPP',
+          messageText: incomingText,
+          timestamp: new Date().toISOString(),
+          intentClassified: classifiedIntent,
+        },
+      ],
+    };
+
     const updatedLead = {
       ...lead,
       status: nextStatus,
       followUpSequence: updatedSequence,
       inbox: [...(lead.inbox || []), newReply],
+      conversationMemory: updatedConversationMemory,
     };
 
     const newActivity = {
       id: `act_${Date.now()}`,
       date: new Date().toISOString(),
       type: 'REPLY_RECEIVED',
-      title: 'Simulated Lead Reply Received',
-      details: `Intent analyzed as ${suggestedStatus.toUpperCase()}. Drafted counter-response.`,
+      title: `Prospect Reply Ingested (${classifiedIntent.replace(/_/g, ' ')})`,
+      details: `Intent: ${classifiedIntent}. Counter-pitch and WhatsApp voice-note script prepared. Next stage: ${nextStatus}.`,
     };
     updatedLead.activities = [newActivity, ...(updatedLead.activities || [])];
 
-    return NextResponse.json({ success: true, lead: updatedLead, replyDraft: reply });
+    return NextResponse.json({
+      success: true,
+      lead: updatedLead,
+      replyDraft: reply,
+      voiceNoteScript,
+      classifiedIntent,
+      salesClosingTip,
+      actionableStep,
+    });
   } catch (error: any) {
     console.error('Error handling reply:', error);
     return NextResponse.json({ error: error?.message || 'Reply handling failed' }, { status: 500 });

@@ -45,10 +45,27 @@ export function LeadTableView({
   const [selectedTier, setSelectedTier] = useState('ALL');
   const [selectedWebsiteStatus, setSelectedWebsiteStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState<'score' | 'value' | 'newest' | 'oldest'>('score');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Extract unique categories & cities for filters
   const categories = Array.from(new Set(leads.map((l) => l.category))).filter(Boolean);
   const cities = Array.from(new Set(leads.map((l) => l.city))).filter(Boolean);
+
+  const activeFilterCount = [
+    selectedCategory !== 'ALL',
+    selectedCity !== 'ALL',
+    selectedStatus !== 'ALL',
+    selectedTier !== 'ALL',
+    selectedWebsiteStatus !== 'ALL',
+  ].filter(Boolean).length;
+
+  const handleResetFilters = () => {
+    setSelectedCategory('ALL');
+    setSelectedCity('ALL');
+    setSelectedStatus('ALL');
+    setSelectedTier('ALL');
+    setSelectedWebsiteStatus('ALL');
+  };
 
   // Apply filters
   const filteredLeads = leads.filter((l) => {
@@ -81,7 +98,7 @@ export function LeadTableView({
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header & Filter Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Lead CRM Pipeline
@@ -92,18 +109,46 @@ export function LeadTableView({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Mobile Filter Toggle */}
+          <button
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className="sm:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center font-bold">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
             Showing <strong className="text-zinc-900 dark:text-zinc-100">{filteredLeads.length}</strong> of{' '}
-            {leads.length} leads
+            {leads.length}
           </span>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar - Responsive (Collapsible on mobile) */}
       <div
         id="leads-filter-bar"
-        className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3"
+        className={`p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3 ${
+          showMobileFilters ? 'block' : 'hidden sm:block'
+        }`}
       >
+        <div className="flex items-center justify-between sm:hidden pb-2 border-b border-zinc-100 dark:border-zinc-800">
+          <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Filter Leads</span>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={handleResetFilters}
+              className="text-[11px] text-rose-500 font-semibold hover:underline"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
           {/* Category Filter */}
           <div>
@@ -223,10 +268,142 @@ export function LeadTableView({
         </div>
       </div>
 
-      {/* Main Table Card */}
+      {/* MOBILE CARD LIST VIEW (Shown on phones < 768px) */}
+      <div id="leads-mobile-card-list" className="md:hidden space-y-3">
+        {filteredLeads.length === 0 ? (
+          <div className="py-12 text-center text-zinc-400 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6">
+            No leads match the selected criteria. Try adjusting or resetting your filters.
+          </div>
+        ) : (
+          filteredLeads.map((lead) => (
+            <div
+              key={lead.id}
+              onClick={() => onSelectLead(lead)}
+              className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3 active:scale-[0.99] transition-all cursor-pointer"
+            >
+              {/* Header: Name, tier badge, deal value */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                      {lead.businessName}
+                    </h3>
+                    {lead.scoreBreakdown?.tier === 'HOT' && (
+                      <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    {lead.category} • {lead.city}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      lead.scoreBreakdown?.tier === 'HOT'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}
+                  >
+                    {lead.scoreBreakdown?.totalScore ?? 0}/100 {lead.scoreBreakdown?.tier || 'WARM'}
+                  </span>
+                  <span className="font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                    ${lead.dealValue || lead.recommendedPrice || 450}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status & Tech Badges */}
+              <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                <span
+                  className={`px-2 py-0.5 rounded font-semibold ${
+                    lead.websiteStatus === 'NO_WEBSITE'
+                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300'
+                      : lead.websiteStatus === 'OUTDATED' || lead.websiteStatus === 'OUTDATED_WEBSITE'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
+                      : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                  }`}
+                >
+                  {(lead.websiteStatus || 'NO_WEBSITE').replace(/_/g, ' ')}
+                </span>
+                {lead.websiteConcept && (
+                  <span className="font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                    Mockup Ready
+                  </span>
+                )}
+                {lead.phone && (
+                  <span className="text-zinc-400 font-mono truncate max-w-[130px]">
+                    {lead.phone}
+                  </span>
+                )}
+              </div>
+
+              {/* Next Best Action Banner */}
+              {lead.nextBestAction?.action && (
+                <div className="p-2 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="font-semibold">Next:</span>
+                  <span className="truncate">{lead.nextBestAction.action.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div
+                className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Stage dropdown */}
+                <select
+                  value={lead.status}
+                  onChange={(e) => onUpdateStatus(lead.id, e.target.value as PipelineStatus)}
+                  className="text-xs font-semibold px-2 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 max-w-[130px] truncate focus:outline-none"
+                >
+                  <option value="NEW">Stage: NEW</option>
+                  <option value="QUALIFIED">Stage: QUALIFIED</option>
+                  <option value="MESSAGE_READY">Stage: READY</option>
+                  <option value="CONTACTED">Stage: CONTACTED</option>
+                  <option value="REPLIED">Stage: REPLIED</option>
+                  <option value="INTERESTED">Stage: INTERESTED</option>
+                  <option value="CALL_BOOKED">Stage: CALL</option>
+                  <option value="PROPOSAL_SENT">Stage: PROPOSAL</option>
+                  <option value="NEGOTIATION">Stage: NEGOTIATION</option>
+                  <option value="WON">Stage: WON 🎉</option>
+                  <option value="LOST">Stage: LOST</option>
+                </select>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => onQuickWhatsApp(lead)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all"
+                    title="Launch WhatsApp"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
+                  </button>
+                  <button
+                    onClick={() => onQuickGenerateProposal(lead)}
+                    className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors"
+                    title="Generate Proposal"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onSelectLead(lead)}
+                    className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                    title="View Details"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* DESKTOP DATA TABLE CONTAINER (Shown on screens >= 768px) */}
       <div
         id="leads-data-table-container"
-        className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden"
+        className="hidden md:block rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden"
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">

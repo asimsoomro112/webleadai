@@ -1,3 +1,60 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   GLASSMORPHISM 2.0 & LIQUID GLASS DESIGN SYSTEM
+   ========================================================================== */
+
+.liquid-glass-top {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03), inset 0 -1px 0 0 rgba(0, 0, 0, 0.04);
+}
+
+:where(.dark, .dark *) .liquid-glass-top {
+  background: rgba(9, 9, 11, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.liquid-glass-dock {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 
+    0 16px 40px -8px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.4),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.9);
+}
+
+:where(.dark, .dark *) .liquid-glass-dock {
+  background: rgba(14, 14, 18, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 
+    0 20px 50px -10px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Liquid Pill Active Item */
+.liquid-pill-active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(20, 184, 166, 0.12) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 
+    0 4px 12px -2px rgba(16, 185, 129, 0.25),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+:where(.dark, .dark *) .liquid-pill-active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(20, 184, 166, 0.15) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  box-shadow: 
+    0 4px 16px -2px rgba(16, 185, 129, 0.4),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+}
+

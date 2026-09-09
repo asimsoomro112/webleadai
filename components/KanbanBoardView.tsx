@@ -78,20 +78,57 @@ export function KanbanBoardView({
   onUpdateStatus,
   onQuickWhatsApp,
 }: KanbanBoardViewProps) {
+  const [mobileSelectedCol, setMobileSelectedCol] = React.useState<string>('ALL');
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-          Client Pipeline Kanban
-        </h1>
-        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-          Track each prospect&apos;s journey from initial web discovery to approved outreach, negotiation, and closed client.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+            Client Pipeline Kanban
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+            Track each prospect&apos;s journey from initial web discovery to approved outreach, negotiation, and closed client.
+          </p>
+        </div>
+      </div>
+
+      {/* Mobile Stage Selector Switcher Pills */}
+      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+        <button
+          onClick={() => setMobileSelectedCol('ALL')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            mobileSelectedCol === 'ALL'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+          }`}
+        >
+          All Stages ({leads.length})
+        </button>
+        {KANBAN_COLUMNS.map((col) => {
+          const count = leads.filter((l) => col.statuses.includes(l.status)).length;
+          return (
+            <button
+              key={col.id}
+              onClick={() => setMobileSelectedCol(col.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                mobileSelectedCol === col.id
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+              }`}
+            >
+              <span>{col.title.replace(/🎉 /g, '')}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Kanban Board Container */}
-      <div className="flex gap-4 overflow-x-auto pb-6 no-scrollbar min-h-[600px]">
-        {KANBAN_COLUMNS.map((col) => {
+      <div className="flex flex-col md:flex-row gap-4 overflow-x-auto pb-6 no-scrollbar min-h-[500px]">
+        {KANBAN_COLUMNS.filter((col) => mobileSelectedCol === 'ALL' || mobileSelectedCol === col.id).map((col) => {
           const colLeads = leads.filter((l) => col.statuses.includes(l.status));
           const colTotalValue = colLeads.reduce(
             (sum, l) => sum + (l.dealValue || l.recommendedPrice || 450),
@@ -101,7 +138,7 @@ export function KanbanBoardView({
           return (
             <div
               key={col.id}
-              className="w-72 shrink-0 flex flex-col rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/70 border border-zinc-200/80 dark:border-zinc-800/80 p-3"
+              className="w-full md:w-72 shrink-0 flex flex-col rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/70 border border-zinc-200/80 dark:border-zinc-800/80 p-3"
             >
               {/* Column Header */}
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200 dark:border-zinc-800">

@@ -36,6 +36,9 @@ import {
   ArrowUpRight,
   Building,
   HelpCircle,
+  Mic,
+  Lightbulb,
+  Volume2,
 } from 'lucide-react';
 import { Lead, PipelineStatus, Proposal, WebsiteConcept, ProjectHandoff } from '@/lib/types';
 import confetti from 'canvas-confetti';
@@ -184,7 +187,7 @@ export function LeadDetailDrawer({
         body: JSON.stringify({ lead, settings, action: 'objection', objection: messageToSend.trim() }),
       });
       const data = await res.json();
-      setReplyClassificationResult(data.replyDraft ? { replyDraft: data.replyDraft } : null);
+      setReplyClassificationResult(data.replyDraft ? data : null);
       if (data.lead) {
         onUpdateLead(lead.id, data.lead);
       }
@@ -256,7 +259,7 @@ export function LeadDetailDrawer({
       className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
     >
       {/* Drawer Top Header */}
-      <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/80 flex items-start justify-between gap-4">
+      <div className="p-4 sm:p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/80 flex items-start justify-between gap-3">
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-50 truncate">
@@ -319,7 +322,7 @@ export function LeadDetailDrawer({
 
       {/* Autonomous Next Best Action Banner */}
       {lead.nextBestAction?.action && (
-        <div className="px-6 py-3 bg-emerald-500/10 dark:bg-emerald-950/40 border-b border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div className="px-4 sm:px-6 py-3 bg-emerald-500/10 dark:bg-emerald-950/40 border-b border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-start gap-2">
             <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div>
@@ -350,7 +353,7 @@ export function LeadDetailDrawer({
       )}
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center space-x-1 px-6 border-b border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto no-scrollbar py-2">
+      <div className="flex items-center space-x-1 px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto no-scrollbar py-2">
         <button
           onClick={() => setActiveTab('overview')}
           className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
@@ -455,7 +458,7 @@ export function LeadDetailDrawer({
       </div>
 
       {/* Tab Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 sm:pb-6 space-y-6 text-sm">
         {/* TAB 1: OVERVIEW & SIGNALS */}
         {activeTab === 'overview' && (
           <div className="space-y-6 animate-in fade-in duration-200">
@@ -1090,7 +1093,7 @@ export function LeadDetailDrawer({
                     >
                       <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
                         <span className="font-bold">
-                          {msg.sender === 'PROSPECT' ? lead.businessName : 'Muhammad Asim'}
+                          {msg.sender === 'PROSPECT' ? lead.businessName : (settings?.profile?.name || 'You')}
                         </span>
                         <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
@@ -1100,20 +1103,20 @@ export function LeadDetailDrawer({
                 </div>
               ) : (
                 <p className="text-xs text-zinc-400 italic py-2">
-                  No replies recorded yet. Once outreach is sent, simulate or paste the client&apos;s reply below to classify intent and get instant closing guidance.
+                  No replies logged yet. Once your outreach is sent, paste the prospect&apos;s WhatsApp/email reply below (or pick a real-world objection) to classify intent and get instant closing guidance.
                 </p>
               )}
             </div>
 
-            {/* Ingest / Simulate Prospect Reply Form */}
+            {/* Ingest Client Reply & Objection Form */}
             <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                Log or Test Prospect Reply
+                Log Prospect Reply & Handle Objection
               </h4>
 
               {/* Preset Reply Chips */}
               <div className="space-y-1.5">
-                <span className="text-[11px] text-zinc-400">Quick Test Scenarios:</span>
+                <span className="text-[11px] text-zinc-400">Common Prospect Scenarios:</span>
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() =>
@@ -1177,59 +1180,141 @@ export function LeadDetailDrawer({
             </div>
 
             {/* Classification Analysis & Winning Response */}
-            {(replyClassificationResult || lead.conversationMemory?.lastSuggestedResponse) && (
-              <div className="p-4 rounded-xl bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-purple-500" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300">
-                      AI Suggested Counter-Response
-                    </span>
+            {Boolean(
+              replyClassificationResult?.replyDraft ||
+              replyClassificationResult?.suggestedResponse ||
+              lead.conversationMemory?.lastSuggestedResponse ||
+              replyClassificationResult?.voiceNoteScript ||
+              (lead.conversationMemory as any)?.suggestedVoiceNote
+            ) && (() => {
+              const counterPitch =
+                replyClassificationResult?.replyDraft ||
+                replyClassificationResult?.suggestedResponse ||
+                lead.conversationMemory?.lastSuggestedResponse ||
+                '';
+              const voiceNote =
+                replyClassificationResult?.voiceNoteScript ||
+                (lead.conversationMemory as any)?.suggestedVoiceNote ||
+                '';
+              const closingTip =
+                replyClassificationResult?.salesClosingTip ||
+                (lead.conversationMemory as any)?.closingStrategy ||
+                '';
+              const actionStep =
+                replyClassificationResult?.actionableStep ||
+                replyClassificationResult?.recommendedNextAction ||
+                (lead.conversationMemory as any)?.actionStep ||
+                '';
+              const detectedIntent =
+                replyClassificationResult?.classifiedIntent ||
+                lead.conversationMemory?.currentIntent ||
+                '';
+
+              return (
+                <div className="space-y-4">
+                  {/* Header & Intent Classification Tag */}
+                  <div className="p-4 rounded-xl bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-purple-500" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300">
+                          AI Objection Counter-Pitch (Direct Reply)
+                        </span>
+                      </div>
+                      {detectedIntent && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                          Intent: {detectedIntent.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                    </div>
+
+                    {counterPitch && (
+                      <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-line bg-white dark:bg-zinc-950 p-3 rounded-lg border border-purple-500/20 font-mono">
+                        {counterPitch}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      {actionStep && (
+                        <span className="text-[11px] text-zinc-400">
+                          Next move: <strong className="text-zinc-300">{actionStep}</strong>
+                        </span>
+                      )}
+                      <div className="flex gap-2 ml-auto">
+                        <button
+                          onClick={() => handleCopyText(counterPitch, 'suggested_resp')}
+                          className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium"
+                        >
+                          {copiedIndex === 'suggested_resp' ? 'Copied!' : 'Copy Reply'}
+                        </button>
+                        <button
+                          onClick={() => handleLaunchWhatsApp(counterPitch)}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold shadow-sm"
+                        >
+                          Send on WhatsApp
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  {replyClassificationResult && (
-                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                      Confidence: {replyClassificationResult.confidence}%
-                    </span>
+
+                  {/* 20-30s WhatsApp Voice-Note Script Card */}
+                  {voiceNote && (
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/30 space-y-3 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                            <Mic className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
+                                30s WhatsApp Voice-Note Script
+                              </span>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                                3.2x Higher Response
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                              Record this aloud casually in WhatsApp voice notes instead of sending text walls.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleCopyText(voiceNote, 'voice_script')}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{copiedIndex === 'voice_script' ? 'Copied!' : 'Copy Script'}</span>
+                        </button>
+                      </div>
+
+                      <div className="p-3.5 rounded-lg bg-white/80 dark:bg-zinc-950/80 border border-emerald-500/20 text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed font-sans italic relative">
+                        <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mb-1.5 not-italic font-bold">
+                          <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                          <span>Voice Recording Script:</span>
+                        </div>
+                        &ldquo;{voiceNote}&rdquo;
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sales Psychology & Closing Strategy */}
+                  {closingTip && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/20 flex items-start gap-2.5 text-xs">
+                      <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-amber-900 dark:text-amber-200 block mb-0.5">
+                          Sales Closing Strategy & Leverage:
+                        </span>
+                        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          {closingTip}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-line bg-white dark:bg-zinc-950 p-3 rounded-lg border border-purple-500/20 font-mono">
-                  {replyClassificationResult?.suggestedResponse || lead.conversationMemory?.lastSuggestedResponse}
-                </p>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-zinc-400">
-                    Recommended action:{' '}
-                    <strong className="text-zinc-300">
-                      {replyClassificationResult?.recommendedNextAction || 'Send suggested response via WhatsApp'}
-                    </strong>
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() =>
-                        handleCopyText(
-                          replyClassificationResult?.suggestedResponse || lead.conversationMemory?.lastSuggestedResponse || '',
-                          'suggested_resp'
-                        )
-                      }
-                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium"
-                    >
-                      {copiedIndex === 'suggested_resp' ? 'Copied!' : 'Copy Response'}
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleLaunchWhatsApp(
-                          replyClassificationResult?.suggestedResponse || lead.conversationMemory?.lastSuggestedResponse || ''
-                        )
-                      }
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold shadow-sm"
-                    >
-                      Send on WhatsApp
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1563,6 +1648,44 @@ export function LeadDetailDrawer({
               </div>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Mobile Sticky Quick Action Bar */}
+      <div className="sm:hidden p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2 z-10 shrink-0">
+        {lead.phone && (
+          <a
+            href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+            className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 transition-colors shrink-0"
+            title="Call Client"
+          >
+            <Phone className="w-4 h-4" />
+          </a>
+        )}
+
+        <button
+          onClick={() => {
+            const msg =
+              replyClassificationResult?.replyDraft ||
+              lead.generatedMessage ||
+              lead.followUpSequence?.[0]?.body ||
+              `Hi ${lead.businessName}, checking in regarding your website!`;
+            handleLaunchWhatsApp(msg);
+          }}
+          className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+        >
+          <Send className="w-3.5 h-3.5" />
+          <span>Launch WhatsApp</span>
+        </button>
+
+        {lead.nextBestAction?.action && (
+          <button
+            onClick={handleExecuteNextAction}
+            className="py-2.5 px-3 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs flex items-center gap-1 shrink-0 active:scale-95 transition-transform shadow-sm"
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+            <span>Next Move</span>
+          </button>
         )}
       </div>
     </div>

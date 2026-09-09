@@ -5,6 +5,7 @@ import { Lead } from '@/lib/types';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
 import { withUserGeminiPool } from '@/lib/user-gemini-context';
 import { normalizeLead } from '@/lib/lead-utils';
+import { probeWebsiteLive } from '@/lib/live-web-probe';
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,9 +61,31 @@ export async function POST(req: NextRequest) {
 
       if (autoResearch) {
         try {
-          const research = await researchBusinessDeep(leadPayload as unknown as Lead);
+          const [research, liveProbe] = await Promise.all([
+            researchBusinessDeep(leadPayload as unknown as Lead),
+            leadPayload.websiteUrl ? probeWebsiteLive(leadPayload.websiteUrl) : Promise.resolve(null),
+          ]);
+
+          const mergedAudit = {
+            ...research.websiteAudit,
+            ...(liveProbe && {
+              hasHttps: liveProbe.hasHttps,
+              isMobileResponsive: liveProbe.hasMobileViewport || research.websiteAudit.isMobileResponsive,
+              pageSpeedEstimate: liveProbe.isReachable
+                ? Math.max(10, Math.min(99, Math.round(100 - (liveProbe.latencyMs / 60))))
+                : 0,
+              liveProbe: {
+                latencyMs: liveProbe.latencyMs,
+                httpStatus: liveProbe.httpStatus,
+                isReachable: liveProbe.isReachable,
+                detectedPlatform: liveProbe.detectedPlatform,
+                hasMobileViewport: liveProbe.hasMobileViewport,
+              },
+            }),
+          };
+
           const scoreBreakdown = calculateLeadScore(
-            { ...leadPayload, websiteAudit: research.websiteAudit, growthSignals: research.growthSignals },
+            { ...leadPayload, websiteAudit: mergedAudit, growthSignals: research.growthSignals },
             settings.scoringWeights
           );
           
@@ -71,7 +94,7 @@ export async function POST(req: NextRequest) {
             growthSignals: research.growthSignals || leadPayload.growthSignals,
             recommendedService: research.recommendedService || leadPayload.recommendedService,
             recommendedPrice: research.recommendedPrice || leadPayload.recommendedPrice,
-            websiteAudit: research.websiteAudit,
+            websiteAudit: mergedAudit,
             competitorGap: research.competitorGap,
             scoreBreakdown,
             dealValue: research.recommendedPrice || leadPayload.dealValue,
@@ -84,7 +107,7 @@ export async function POST(req: NextRequest) {
             date: new Date().toISOString(),
             type: 'RESEARCHED',
             title: 'Auto-Researched during Discovery',
-            details: `Found ${research.painPoints?.length || 0} pain points.`,
+            details: `Found ${research.painPoints?.length || 0} pain points.${liveProbe ? ` Live HTTP ping: ${liveProbe.latencyMs}ms.` : ''}`,
           });
         } catch (err) {
           console.error(`Research failed for ${b.businessName}`, err);

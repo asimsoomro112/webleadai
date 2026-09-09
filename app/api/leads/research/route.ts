@@ -3,6 +3,7 @@ import { researchBusinessDeep } from '@/lib/gemini';
 import { calculateLeadScore } from '@/lib/scorer';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
 import { withUserGeminiPool } from '@/lib/user-gemini-context';
+import { probeWebsiteLive } from '@/lib/live-web-probe';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,12 +16,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead and Settings are required payload' }, { status: 400 });
     }
 
-    const research = await withUserGeminiPool(authResult.uid, () => researchBusinessDeep(lead));
+    // Run deep AI research and real HTTP probe in parallel if websiteUrl exists
+    const [research, liveProbe] = await Promise.all([
+      withUserGeminiPool(authResult.uid, () => researchBusinessDeep(lead)),
+      lead.websiteUrl ? probeWebsiteLive(lead.websiteUrl) : Promise.resolve(null),
+    ]);
+
+    // Merge real measured technical metrics into the website audit
+    const mergedAudit = {
+      ...research.websiteAudit,
+      ...(liveProbe && {
+        hasHttps: liveProbe.hasHttps,
+        isMobileResponsive: liveProbe.hasMobileViewport || research.websiteAudit.isMobileResponsive,
+        pageSpeedEstimate: liveProbe.isReachable
+          ? Math.max(10, Math.min(99, Math.round(100 - (liveProbe.latencyMs / 60))))
+          : 0,
+        liveProbe: {
+          latencyMs: liveProbe.latencyMs,
+          httpStatus: liveProbe.httpStatus,
+          isReachable: liveProbe.isReachable,
+          detectedPlatform: liveProbe.detectedPlatform,
+          hasMobileViewport: liveProbe.hasMobileViewport,
+        },
+        metricTypes: {
+          ...research.websiteAudit.metricTypes,
+          hasHttps: 'MEASURED' as const,
+          pageSpeedEstimate: 'MEASURED' as const,
+        },
+      }),
+    };
 
     const scoreBreakdown = calculateLeadScore(
       {
         ...lead,
-        websiteAudit: research.websiteAudit,
+        websiteAudit: mergedAudit,
         growthSignals: research.growthSignals,
       },
       settings.scoringWeights
@@ -32,7 +61,7 @@ export async function POST(req: NextRequest) {
       growthSignals: research.growthSignals,
       recommendedService: research.recommendedService,
       recommendedPrice: research.recommendedPrice,
-      websiteAudit: research.websiteAudit,
+      websiteAudit: mergedAudit,
       competitorGap: research.competitorGap,
       scoreBreakdown,
       dealValue: research.recommendedPrice,

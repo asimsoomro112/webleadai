@@ -422,7 +422,7 @@ export default function ConceptPreviewPage() {
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all"
           >
             <MessageCircle className="w-4 h-4" />
-            Launch With Muhammad Asim
+            Launch With {developer.name || 'Developer'}
           </a>
         </div>
       </aside>

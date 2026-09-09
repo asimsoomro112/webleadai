@@ -944,36 +944,173 @@ Provide a short, actionable piece of advice (1-2 paragraphs) for the sales rep.`
   return res.text || 'No advice generated';
 }
 
-export async function generateEmailReply(lead: Lead, profile: any, action: string, objection?: string) {
-  const prompt = `You are a sales rep for ${profile.name}.
-Lead: ${lead.businessName}.
-They replied to your email with a ${action}. ${objection ? 'Objection: ' + objection : ''}
-Draft a short reply and determine if they are 'positive', 'negative', or 'objection'.
-Return JSON with { "reply": "...", "suggestedStatus": "positive|negative|objection" }`;
-
-  const res = await callGeminiWithModelCascade((model, client) =>
-    client.models.generateContent({
-      model,
-      contents: prompt,
-      config: { responseMimeType: 'application/json' },
-    }),
-  );
-  return JSON.parse(res.text || '{}');
+export interface ReplyAnalysisResult {
+  reply: string;
+  suggestedStatus: 'positive' | 'negative' | 'objection';
+  classifiedIntent: string;
+  voiceNoteScript?: string;
+  salesClosingTip?: string;
+  actionableStep?: string;
 }
 
-export async function generateProjectHandoff(lead: Lead, profile: any, instructions: string) {
-  const prompt = `Generate a project handoff brief.
-Lead: ${lead.businessName}.
-Agency: ${profile.name}.
-Instructions: ${instructions}.
-Return JSON with { "summary": "...", "timeline": "...", "deliverables": ["..."] }`;
+export async function generateEmailReply(
+  lead: Lead,
+  profile: any,
+  action: string,
+  objection?: string
+): Promise<ReplyAnalysisResult> {
+  const agencyName = profile?.name || 'Your Web Agency';
+  const portfolioUrl = profile?.portfolioUrl || '';
+  const prospectMessage = objection || (action === 'accept' ? 'Yes, I am interested.' : action === 'reject' ? 'No thanks.' : 'Can you tell me more?');
 
-  const res = await callGeminiWithModelCascade((model, client) =>
-    client.models.generateContent({
-      model,
-      contents: prompt,
-      config: { responseMimeType: 'application/json' },
-    }),
-  );
-  return JSON.parse(res.text || '{}');
+  const prompt = `You are an elite B2B sales strategist and senior web consultant for "${agencyName}".
+The prospect "${lead.businessName}" (${lead.category} in ${lead.city}, ${lead.country}) has sent this reply to cold outreach:
+"${prospectMessage}"
+
+Lead Context:
+- Category: ${lead.category}
+- City: ${lead.city}
+- Current website status: ${lead.websiteStatus || 'NO_WEBSITE'}
+- Deal value estimate: $${lead.dealValue || lead.recommendedPrice || 450}
+- Has live mockup ready: ${Boolean(lead.websiteConcept)}
+
+Analyze the psychological intent behind this reply, handle any objection using modern low-friction consulting methods, and generate:
+1. "reply": A concise, natural, high-converting WhatsApp / Email reply (maximum 3-4 sentences). Empathize, reframe value around their revenue/customers, and propose a zero-friction next step (e.g. sharing a 60-second interactive preview or 5-min quick chat). Never be pushy or desperate.
+2. "suggestedStatus": "positive" (wants demo, prices, timeline, or agreed) | "negative" (explicit 'not interested', 'remove me') | "objection" (price concern, already have someone, timing, skepticism).
+3. "classifiedIntent": e.g. "ASKING_FOR_DEMO", "PRICE_OBJECTION", "HAS_EXISTING_DEVELOPER", "SOCIAL_MEDIA_SUFFICIENT", "TIMING_LATER", "POSITIVE_INTEREST", "UNSUBSCRIBE".
+4. "voiceNoteScript": A natural 30-second conversational voice-note script that the freelancer can record and send on WhatsApp. Tone: friendly, confident, local context, zero sales jargon.
+5. "salesClosingTip": 1 actionable psychological strategy for the developer to win this client.
+6. "actionableStep": The immediate next action to take.
+
+Return strictly valid JSON with this exact structure:
+{
+  "reply": "...",
+  "suggestedStatus": "positive" | "negative" | "objection",
+  "classifiedIntent": "...",
+  "voiceNoteScript": "...",
+  "salesClosingTip": "...",
+  "actionableStep": "..."
+}`;
+
+  try {
+    const res = await callGeminiWithModelCascade((model, client) =>
+      client.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      }),
+    );
+    const parsed = extractJsonFromResponse<ReplyAnalysisResult>(res?.text || '');
+    if (parsed && parsed.reply) {
+      return parsed;
+    }
+  } catch (err) {
+    console.error('Gemini reply analysis error:', err);
+  }
+
+  // Fallback if parsing or API failed
+  const isPositive = /yes|interested|demo|cost|price|how much|send/i.test(prospectMessage);
+  const isNegative = /no|stop|don't|not interested|remove/i.test(prospectMessage);
+
+  return {
+    reply: isPositive
+      ? `Hi! Glad to hear that. I've already prepared an interactive mobile concept for ${lead.businessName} so you can see how an instant WhatsApp booking system would look. Would you like me to send the link here?`
+      : isNegative
+      ? `Understood completely! Thanks for letting me know, and wishing ${lead.businessName} continued success.`
+      : `Thanks for the reply! Completely understand your question. Most businesses in ${lead.city} have similar concerns before seeing the numbers. Happy to share a quick 1-page breakdown if you'd like?`,
+    suggestedStatus: isPositive ? 'positive' : isNegative ? 'negative' : 'objection',
+    classifiedIntent: isPositive ? 'POSITIVE_INQUIRY' : isNegative ? 'NOT_INTERESTED' : 'GENERAL_OBJECTION',
+    voiceNoteScript: `Hey, thanks for getting back to me! Just wanted to send a quick note — no pressure at all. I actually put together a quick interactive mockup for ${lead.businessName} showing how you can capture table reservations directly on WhatsApp. Let me know if you'd like me to send the link over!`,
+    salesClosingTip: 'Focus on eliminating friction: offer the free preview without asking for a commitment or phone call yet.',
+    actionableStep: isPositive ? 'Send live preview mockup link' : 'Archive or mark for follow-up next quarter',
+  };
+}
+
+export async function generateProjectHandoff(lead: Lead, profile: any, instructions?: string) {
+  const agencyName = profile?.name || 'WebLead Development Studio';
+  const prompt = `You are the lead solutions architect at "${agencyName}".
+Create an enterprise-grade Project Technical Handoff and Client Onboarding Packet for this newly closed client:
+- Client Name: ${lead.businessName}
+- Category: ${lead.category}
+- City: ${lead.city}, ${lead.country}
+- Contract / Deal Value: $${lead.dealValue || lead.recommendedPrice || 499}
+- Service Scope: ${lead.recommendedService || 'Next.js Web Application & WhatsApp Booking Integration'}
+- Pain Points to Solve: ${(lead.painPoints || []).join(', ')}
+${instructions ? `- Custom Instructions: ${instructions}` : ''}
+
+Generate a comprehensive JSON document with:
+1. "summary": Executive overview of the engagement goals and deliverables.
+2. "timeline": Detailed timeline breakdown (e.g. "Day 1-2: Architecture & Content, Day 3-4: Components & WhatsApp Funnel, Day 5: Testing & Go-Live").
+3. "techStack": Array of chosen technologies (e.g. ["Next.js 15 (App Router)", "TypeScript", "Tailwind CSS", "WhatsApp Cloud Webhook", "Vercel / Cloudflare Edge"]).
+4. "deliverables": Array of 5-7 distinct production deliverables.
+5. "sitemap": Array of pages with purpose (e.g. [{ "page": "Home", "purpose": "Hero banner, trust proof, service highlights" }, ...]).
+6. "conversionTriggers": Array of specific conversion-boosting mechanisms to implement (e.g. 1-tap WhatsApp booking button, mobile sticky call bar, schema review markup).
+7. "clientChecklist": Array of items needed from the client before launch (e.g. Domain registrar credentials, official high-res logo, WhatsApp business phone number, menu/service catalog).
+8. "maintenancePlan": Recommended ongoing hosting, security, and update terms.
+
+Return strictly valid JSON:
+{
+  "summary": "...",
+  "timeline": "...",
+  "techStack": ["..."],
+  "deliverables": ["..."],
+  "sitemap": [{ "page": "...", "purpose": "..." }],
+  "conversionTriggers": ["..."],
+  "clientChecklist": ["..."],
+  "maintenancePlan": "..."
+}`;
+
+  try {
+    const res = await callGeminiWithModelCascade((model, client) =>
+      client.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      }),
+    );
+    const parsed = extractJsonFromResponse<any>(res?.text || '');
+    if (parsed && parsed.deliverables) {
+      return parsed;
+    }
+  } catch (err) {
+    console.error('Project handoff generation failed:', err);
+  }
+
+  // Fallback comprehensive spec
+  return {
+    summary: `Complete mobile-first web overhaul for ${lead.businessName} focusing on direct customer acquisition and 1-tap WhatsApp conversion.`,
+    timeline: '5-7 business days from asset receipt to live production deployment.',
+    techStack: ['Next.js 15 (App Router)', 'TypeScript', 'Tailwind CSS', 'WhatsApp Business Intent API', 'Vercel Edge Hosting'],
+    deliverables: [
+      'Modern, mobile-first responsive web application',
+      'Direct WhatsApp booking and inquiry integration with prefilled messages',
+      'Google Maps & Local SEO Schema Markup',
+      'High-speed optimization (>90 Lighthouse score)',
+      'SSL certificate setup and custom domain DNS configuration',
+    ],
+    sitemap: [
+      { page: 'Home', purpose: 'Hero value proposition, quick booking CTA, business highlights' },
+      { page: 'Services / Menu', purpose: 'Interactive catalog with instant order/inquiry buttons' },
+      { page: 'Reviews & Proof', purpose: 'Google reviews slider and customer trust cues' },
+      { page: 'Contact & Location', purpose: 'Interactive map, open hours, and 1-tap dial/WhatsApp' },
+    ],
+    conversionTriggers: [
+      'Sticky bottom mobile action bar (Call / WhatsApp)',
+      '1-tap prefilled WhatsApp message: "Hi, I would like to book an appointment / place an order"',
+      'Local schema.org markup for rich Google search snippet',
+    ],
+    clientChecklist: [
+      'Domain name registrar login or DNS access',
+      'High-resolution logo & business photography',
+      'Current menu or service rate card',
+      'Official WhatsApp business contact number',
+    ],
+    maintenancePlan: 'Monthly uptime monitoring, security updates, and content revisions included in post-launch retainer.',
+  };
 }
