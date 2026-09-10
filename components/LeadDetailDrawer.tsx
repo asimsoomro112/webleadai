@@ -39,6 +39,8 @@ import {
   Mic,
   Lightbulb,
   Volume2,
+  Download,
+  Code,
 } from 'lucide-react';
 import { Lead, PipelineStatus, Proposal, WebsiteConcept, ProjectHandoff } from '@/lib/types';
 import confetti from 'canvas-confetti';
@@ -166,12 +168,45 @@ export function LeadDetailDrawer({
       const data = await res.json();
       if (data.lead) {
         onUpdateLead(lead.id, data.lead);
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.6 },
+        });
       }
     } catch (err) {
       console.error('Failed to generate concept:', err);
     } finally {
       setIsGeneratingConcept(false);
     }
+  };
+
+  const handleDownloadHtml = () => {
+    if (!lead.websiteConcept) return;
+    let htmlContent = lead.websiteConcept.standaloneHtml;
+    if (!htmlContent) {
+      const previewUrl = typeof window !== 'undefined' ? `${window.location.origin}/preview/${lead.websiteConcept.previewId || lead.id}` : '';
+      htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${lead.websiteConcept.headline}</title><meta http-equiv="refresh" content="0; url=${previewUrl}"></head><body><p>Redirecting to live interactive preview: <a href="${previewUrl}">${previewUrl}</a></p></body></html>`;
+    }
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeName = (lead.businessName || 'demo-website').toLowerCase().replace(/[^a-z0-9]/g, '-');
+    link.href = url;
+    link.download = `${safeName}-preview.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyHtml = () => {
+    if (!lead.websiteConcept) return;
+    const previewUrl = typeof window !== 'undefined' ? `${window.location.origin}/preview/${lead.websiteConcept.previewId || lead.id}` : '';
+    const htmlContent =
+      lead.websiteConcept.standaloneHtml ||
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${lead.websiteConcept.headline}</title></head><body><h1>${lead.websiteConcept.headline}</h1><p>${lead.websiteConcept.subheadline}</p><p><a href="${previewUrl}">View Online Prototype</a></p></body></html>`;
+    handleCopyText(htmlContent, 'concept_html');
   };
 
   // Process Ingested or Simulated Prospect Reply
@@ -821,7 +856,7 @@ export function LeadDetailDrawer({
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-2 shrink-0">
+                  <div className="flex flex-wrap sm:flex-col gap-2 shrink-0">
                     <Link
                       href={`/preview/${lead.websiteConcept.previewId || lead.id}`}
                       target="_blank"
@@ -830,6 +865,33 @@ export function LeadDetailDrawer({
                       <span>Open Live Mockup</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
+
+                    <button
+                      onClick={handleDownloadHtml}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-all"
+                      title="Download complete standalone HTML demo website"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download HTML Demo</span>
+                    </button>
+
+                    <button
+                      onClick={handleCopyHtml}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium"
+                      title="Copy complete standalone HTML code"
+                    >
+                      {copiedIndex === 'concept_html' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copied HTML Code!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Code className="w-3.5 h-3.5" />
+                          <span>Copy HTML</span>
+                        </>
+                      )}
+                    </button>
 
                     <button
                       onClick={() =>
@@ -1548,27 +1610,74 @@ export function LeadDetailDrawer({
 
                     <p className="text-xs text-zinc-600 dark:text-zinc-400">{prop.recommendedSolution}</p>
 
-                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-                      <button
-                        onClick={() =>
-                          handleCopyText(
-                            prop.markdownContent ||
-                              `# Proposal: ${prop.businessName}\n\n**Solution:** ${prop.recommendedSolution}\n\n**Package:** ${prop.packageTier} ($${prop.totalPrice} USD)\n\n**Scope:**\n${(prop.scopeFeatures || []).map((f) => `- ${f.feature}: ${f.benefit}`).join('\n')}\n\n**Timeline:** ${prop.timelineWeeks} week(s)\n**Revision Policy:** ${prop.revisionPolicy}`,
-                            prop.id
-                          )
-                        }
-                        className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
-                      >
-                        {copiedIndex === prop.id ? (
-                          <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5" /> Copied Full Proposal
-                          </span>
+                    <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {lead.websiteConcept ? (
+                          <Link
+                            href={`/preview/${lead.websiteConcept.previewId || lead.id}`}
+                            target="_blank"
+                            className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold"
+                          >
+                            <Globe className="w-3.5 h-3.5" />
+                            <span>Preview Demo Website</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
                         ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" /> Copy Full Proposal
-                          </>
+                          <button
+                            onClick={handleGenerateConcept}
+                            disabled={isGeneratingConcept}
+                            className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:text-emerald-400 font-medium"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>{isGeneratingConcept ? 'Building Demo...' : 'Attach Demo Website'}</span>
+                          </button>
                         )}
-                      </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {lead.websiteConcept && (
+                          <button
+                            onClick={() => {
+                              const previewUrl = `${window.location.origin}/preview/${lead.websiteConcept?.previewId || lead.id}`;
+                              const pitch =
+                                `Hi ${lead.businessName},\n\n` +
+                                `I have prepared a tailored ${prop.packageTier} web proposal for your business.\n\n` +
+                                `🌐 *Interactive Live Demo Website:* ${previewUrl}\n` +
+                                `Investment: $${prop.totalPrice} USD | Timeline: ${prop.timelineWeeks} week(s)\n\n` +
+                                `Click the demo website link above to test how your new modern web presence will look!`;
+                              handleLaunchWhatsApp(pitch);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <Send className="w-3 h-3" />
+                            <span>Send Proposal + Demo on WhatsApp</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            const previewUrl = lead.websiteConcept
+                              ? `\n\n**🌐 Live Demo Website Concept:** ${window.location.origin}/preview/${lead.websiteConcept.previewId || lead.id}\n(Interactive live demo mockup customized for ${prop.businessName})`
+                              : '';
+                            const fullText =
+                              (prop.markdownContent ||
+                                `# Proposal: ${prop.businessName}\n\n**Solution:** ${prop.recommendedSolution}\n\n**Package:** ${prop.packageTier} ($${prop.totalPrice} USD)\n\n**Scope:**\n${(prop.scopeFeatures || []).map((f) => `- ${f.feature}: ${f.benefit}`).join('\n')}\n\n**Timeline:** ${prop.timelineWeeks} week(s)\n**Revision Policy:** ${prop.revisionPolicy}`) +
+                              previewUrl;
+                            handleCopyText(fullText, prop.id);
+                          }}
+                          className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
+                        >
+                          {copiedIndex === prop.id ? (
+                            <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5" /> Copied Full Proposal
+                            </span>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" /> Copy Full Proposal
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

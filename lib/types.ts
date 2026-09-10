@@ -217,6 +217,7 @@ export interface WebsiteConcept {
     description: string;
     keywords: string[];
   };
+  standaloneHtml?: string;
 }
 
 export type ProspectIntent =
@@ -335,6 +336,7 @@ export interface Proposal {
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED';
   createdAt: string;
   pdfExportAvailable: boolean;
+  previewUrl?: string;
 }
 
 export interface ProjectHandoffDeliverable {

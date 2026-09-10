@@ -15,9 +15,53 @@ const userGeminiContext = new AsyncLocalStorage<UserGeminiContext>();
  * key can never be shared with another signed-in user.
  */
 export async function withUserGeminiPool<T>(uid: string, operation: () => Promise<T>): Promise<T> {
-  const pool = await getUserApiKeyPool(uid);
-  if (pool.keys.length === 0) {
-    throw new Error('No Gemini API key is saved. Add a key in the API Key Pool before continuing.');
+  let pool: ApiKeyPoolSettings;
+  try {
+    pool = await getUserApiKeyPool(uid);
+  } catch {
+    pool = { keys: [], autoRotateOnQuota: true };
+  }
+
+  // If user has no custom keys saved in Firestore, fallback to system env keys
+  if (!pool.keys || pool.keys.length === 0) {
+    const envKey = process.env.GEMINI_API_KEY;
+    const envKeysList = process.env.GEMINI_API_KEYS;
+    const fallbackKeys = [];
+
+    if (envKey) {
+      fallbackKeys.push({
+        id: 'sys_env_gemini_key',
+        name: 'System Default Key',
+        key: envKey,
+        maskedKey: '••••••••',
+        status: 'ACTIVE' as const,
+        addedAt: new Date().toISOString(),
+        successCount: 0,
+        failureCount: 0,
+        isSystemDefault: true,
+      });
+    }
+
+    if (envKeysList) {
+      envKeysList.split(',').forEach((k, i) => {
+        const clean = k.trim();
+        if (clean && clean !== envKey) {
+          fallbackKeys.push({
+            id: `env_key_${i}`,
+            name: `Environment Key #${i + 1}`,
+            key: clean,
+            maskedKey: '••••••••',
+            status: 'ACTIVE' as const,
+            addedAt: new Date().toISOString(),
+            successCount: 0,
+            failureCount: 0,
+            isSystemDefault: true,
+          });
+        }
+      });
+    }
+
+    pool = { keys: fallbackKeys, autoRotateOnQuota: true };
   }
 
   const context: UserGeminiContext = { pool, hasChanges: false };
@@ -25,8 +69,12 @@ export async function withUserGeminiPool<T>(uid: string, operation: () => Promis
     try {
       return await operation();
     } finally {
-      if (context.hasChanges) {
-        await saveUserApiKeyPool(uid, context.pool);
+      if (context.hasChanges && pool.keys.some((k) => !k.isSystemDefault)) {
+        try {
+          await saveUserApiKeyPool(uid, context.pool);
+        } catch (e) {
+          console.warn('Could not persist key pool update:', e);
+        }
       }
     }
   });

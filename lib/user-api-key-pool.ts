@@ -51,16 +51,29 @@ function normalizePool(value: unknown): ApiKeyPoolSettings {
 }
 
 function poolRef(uid: string) {
-  return getAdminFirestore().collection(COLLECTION).doc(uid);
+  const db = getAdminFirestore();
+  if (!db) return null;
+  return db.collection(COLLECTION).doc(uid);
 }
 
 export async function getUserApiKeyPool(uid: string): Promise<ApiKeyPoolSettings> {
-  const snapshot = await poolRef(uid).get();
+  const ref = poolRef(uid);
+  if (!ref) {
+    return {
+      keys: [],
+      autoRotateOnQuota: true,
+    };
+  }
+  const snapshot = await ref.get();
   return normalizePool(snapshot.data());
 }
 
 export async function saveUserApiKeyPool(uid: string, pool: ApiKeyPoolSettings): Promise<ApiKeyPoolSettings> {
   const normalized = normalizePool(pool);
+  const ref = poolRef(uid);
+  if (!ref) {
+    return normalized;
+  }
   const firestorePool = {
     keys: normalized.keys.map(({ lastUsedAt, lastError, ...key }) => ({
       ...key,
@@ -73,7 +86,7 @@ export async function saveUserApiKeyPool(uid: string, pool: ApiKeyPoolSettings):
     updatedAt: new Date().toISOString(),
   };
 
-  await poolRef(uid).set(firestorePool);
+  await ref.set(firestorePool);
   return normalized;
 }
 

@@ -1111,7 +1111,9 @@ class AppStore {
   }
 
   public setWebsiteConcept(leadId: string, concept: WebsiteConcept): Lead | null {
-    return this.updateLead(leadId, {
+    const target = this.leads.find((l) => l.id === leadId || l.websiteConcept?.previewId === leadId);
+    if (!target) return null;
+    return this.updateLead(target.id, {
       websiteConcept: concept,
     });
   }

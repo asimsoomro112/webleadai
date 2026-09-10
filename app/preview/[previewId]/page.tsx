@@ -20,6 +20,7 @@ import {
   Star,
   Monitor,
   Tablet,
+  Download,
 } from 'lucide-react';
 import { WebsiteConcept } from '@/lib/types';
 
@@ -94,6 +95,21 @@ export default function ConceptPreviewPage() {
   const whatsappUrl = `https://wa.me/${leadPhone || devPhone}?text=${encodeURIComponent(`Hi ${lead.businessName || 'there'}, I would like to inquire regarding reservations and orders.`)}`;
   const claimWebsiteUrl = `https://wa.me/${devPhone}?text=${encodeURIComponent(`Hi ${developer?.name || 'there'}, I love the website concept for ${lead.businessName || 'our business'}! I want to discuss launching it.`)}`;
 
+  const handleDownloadStandaloneHtml = () => {
+    if (!data) return;
+    const { lead: currentLead, concept: currentConcept } = data;
+    const htmlContent = currentConcept.standaloneHtml || `<!DOCTYPE html><html><head><title>${currentConcept.headline}</title></head><body><h1>${currentConcept.headline}</h1><p>${currentConcept.subheadline}</p></body></html>`;
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(currentLead.businessName || 'website-demo').toLowerCase().replace(/[^a-z0-9]/g, '-')}-demo.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Top Bar Banner for Client Presentation */}
@@ -155,6 +171,15 @@ export default function ConceptPreviewPage() {
                 <span className="hidden md:inline">Mobile</span>
               </button>
             </div>
+
+            <button
+              onClick={handleDownloadStandaloneHtml}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all border border-slate-700"
+              title="Download standalone single-file HTML website demo"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Download HTML</span>
+            </button>
 
             <a
               href={claimWebsiteUrl}

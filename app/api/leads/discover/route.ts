@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { discoverRealBusinesses, researchBusinessDeep, generatePersonalizedOutreach } from '@/lib/gemini';
+import { discoverRealBusinesses, researchBusinessDeep, generatePersonalizedOutreach, generateWebsiteConcept } from '@/lib/gemini';
 import { calculateLeadScore } from '@/lib/scorer';
 import { Lead } from '@/lib/types';
 import { isApiError, requireApiUser } from '@/lib/api-auth';
 import { withUserGeminiPool } from '@/lib/user-gemini-context';
 import { normalizeLead } from '@/lib/lead-utils';
 import { probeWebsiteLive } from '@/lib/live-web-probe';
+import { appStore } from '@/lib/store';
 
 export async function POST(req: NextRequest) {
   try {
@@ -137,7 +138,28 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      addedLeads.push(normalizeLead(leadPayload));
+      // Auto-generate high-converting website concept prototype with standalone HTML
+      try {
+        const concept = await generateWebsiteConcept({
+          lead: leadPayload as unknown as Lead,
+          profile: settings.profile,
+        });
+        leadPayload.websiteConcept = concept;
+        leadPayload.activities.push({
+          id: `act_${Date.now()}_c`,
+          timestamp: new Date().toISOString(),
+          date: new Date().toISOString(),
+          type: 'CONCEPT_GENERATED',
+          title: 'Auto-Generated Live Website Concept',
+          details: `Built interactive preview and standalone HTML mockup for ${leadPayload.businessName}.`,
+        });
+      } catch (err) {
+        console.error(`Concept generation note for ${b.businessName}:`, err);
+      }
+
+      const normalized = normalizeLead(leadPayload);
+      appStore.addLead(normalized);
+      addedLeads.push(normalized);
     }
 
       return NextResponse.json({ success: true, leads: addedLeads });
